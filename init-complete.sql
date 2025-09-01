@@ -1,5 +1,5 @@
 -- Database initialization for AI Bootcamp
-CREATE DATABASE IF NOT EXISTS aibc_db;
+-- Database already created by Docker environment variable
 
 \c aibc_db;
 

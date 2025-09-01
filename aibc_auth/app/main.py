@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Bootcamp Auth Service")
-    await create_tables()
+    # Tables are created by init-complete.sql in Docker
     yield
     logger.info("Shutting down AI Bootcamp Auth Service")
 
