@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: aibc_db
       POSTGRES_USER: aibc_admin
-      POSTGRES_PASSWORD: AIbc2024SecureP@ss
+      POSTGRES_PASSWORD: AIbc2024SecurePass
     volumes:
       - ./init-complete.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
@@ -30,7 +30,7 @@ services:
     env_file:
       - ./aibc_auth/.env
     environment:
-      - DATABASE_URL=postgresql://aibc_admin:AIbc2024SecureP@ss@postgres:5432/aibc_db
+      - DATABASE_URL=postgresql://aibc_admin:AIbc2024SecurePass@postgres:5432/aibc_db
     ports:
       - "8000:8000"
     depends_on:

@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Bootcamp Auth Service")
-    # Tables are created by init-complete.sql in Docker
     yield
     logger.info("Shutting down AI Bootcamp Auth Service")
 
@@ -44,9 +43,9 @@ app.add_middleware(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS.split(","),
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -64,3 +63,13 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "auth"}
+
+@app.get("/health/db")
+async def health_check_db():
+    try:
+        from app.db.database import engine
+        async with engine.begin() as conn:
+            result = await conn.execute("SELECT 1")
+            return {"status": "healthy", "service": "auth", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "service": "auth", "database": "disconnected", "error": str(e)}

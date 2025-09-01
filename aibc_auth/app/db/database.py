@@ -2,16 +2,22 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
 engine = create_async_engine(
     settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
     echo=False,
-    pool_size=20,
-    max_overflow=0,
+    pool_size=10,
+    max_overflow=20,
     pool_pre_ping=True,
-    pool_recycle=3600
+    pool_recycle=300,
+    connect_args={
+        "server_settings": {
+            "application_name": "aibc_auth",
+        }
+    }
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -23,15 +29,22 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 async def get_db():
-    async with AsyncSessionLocal() as session:
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+            async with AsyncSessionLocal() as session:
+                yield session
+                await session.commit()
+                return
+        except Exception as e:
+            retry_count += 1
+            logger.warning(f"Database connection attempt {retry_count} failed: {e}")
+            if retry_count >= max_retries:
+                logger.error("Max database connection retries exceeded")
+                raise
+            await asyncio.sleep(1)  # Brief wait before retry
 
 async def create_tables():
     async with engine.begin() as conn:

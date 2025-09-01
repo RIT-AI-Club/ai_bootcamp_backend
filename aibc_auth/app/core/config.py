@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
     JWT_REFRESH_SECRET_KEY: str = secrets.token_urlsafe(32)
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
@@ -23,16 +23,15 @@ class Settings(BaseSettings):
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
     
-    ENVIRONMENT: str = "production"
+    ENVIRONMENT: str = "development"
+    
+    def get_cors_origins(self) -> List[str]:
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        return self.CORS_ORIGINS
     
     class Config:
         env_file = ".env"
         case_sensitive = True
-        
-        @classmethod
-        def parse_cors_origins(cls, v):
-            if isinstance(v, str):
-                return [origin.strip() for origin in v.split(",")]
-            return v
 
 settings = Settings()
