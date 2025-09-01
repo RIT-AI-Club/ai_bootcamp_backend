@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aibc_postgres
+    environment:
+      POSTGRES_USER: aibc_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AIbc2024SecureP@ss}
+      POSTGRES_DB: aibc_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./init-complete.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - aibc_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aibc_admin -d aibc_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  auth_service:
+    build:
+      context: ./aibc_auth
+      dockerfile: Dockerfile
+    container_name: aibc_auth
+    environment:
+      DATABASE_URL: postgresql://aibc_admin:${POSTGRES_PASSWORD:-AIbc2024SecureP@ss}@postgres:5432/aibc_db
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-256-bit-secret-key-change-in-production}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-your-refresh-256-bit-secret-key-change-in-production}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aibc_network
+    restart: unless-stopped
+
+networks:
+  aibc_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
