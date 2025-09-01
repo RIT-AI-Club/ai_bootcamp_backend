@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, INET
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.db.database import Base
 import uuid
@@ -28,8 +28,8 @@ class RefreshToken(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     revoked_at = Column(DateTime(timezone=True), nullable=True)
-    ip_address = Column(INET, nullable=True)
-    user_agent = Column(String, nullable=True)
+    ip_address = Column(Text, nullable=True)
+    user_agent = Column(Text, nullable=True)
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -37,8 +37,8 @@ class Session(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     session_token = Column(String(255), unique=True, nullable=False)
-    ip_address = Column(INET, nullable=True)
-    user_agent = Column(String, nullable=True)
+    ip_address = Column(Text, nullable=True)
+    user_agent = Column(Text, nullable=True)
     last_activity = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

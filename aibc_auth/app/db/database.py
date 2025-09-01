@@ -29,22 +29,8 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 async def get_db():
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
-        try:
-            async with AsyncSessionLocal() as session:
-                yield session
-                await session.commit()
-                return
-        except Exception as e:
-            retry_count += 1
-            logger.warning(f"Database connection attempt {retry_count} failed: {e}")
-            if retry_count >= max_retries:
-                logger.error("Max database connection retries exceeded")
-                raise
-            await asyncio.sleep(1)  # Brief wait before retry
+    async with AsyncSessionLocal() as session:
+        yield session
 
 async def create_tables():
     async with engine.begin() as conn:
