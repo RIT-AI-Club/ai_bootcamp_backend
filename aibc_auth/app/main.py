@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 import sys
-from app.api.v1 import auth, users
+from app.api.v1 import auth, users, progress
 from app.core.config import settings
 from app.db.database import engine, create_tables
 from app.core.security import limiter
@@ -59,6 +59,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(progress.router, tags=["Progress"])
 
 @app.get("/health")
 async def health_check():
