@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, or_, func, desc
-from sqlalchemy.orm import selectinload
 from typing import Optional, List, Dict
 from datetime import datetime, date, timedelta
 from uuid import UUID
@@ -213,7 +212,6 @@ class ProgressCRUD:
         result = await db.execute(
             select(UserAchievement)
             .where(UserAchievement.user_id == user_id)
-            .options(selectinload(UserAchievement.achievement_id))
             .order_by(desc(UserAchievement.earned_at))
         )
         return result.scalars().all()

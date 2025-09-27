@@ -8,6 +8,9 @@ import sys
 from app.api.v1 import auth, users, progress
 from app.core.config import settings
 from app.db.database import engine, create_tables
+# Import models to ensure they're registered with SQLAlchemy
+from app.models.user import User
+from app.models.progress import Pathway, Module, UserProgress, ModuleCompletion, Achievement, UserAchievement, LearningStreak
 from app.core.security import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded

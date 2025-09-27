@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
@@ -127,7 +127,7 @@ async def get_user_progress_summary(
 async def get_dashboard_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> Dict[str, Any]:
     dashboard_data = await ProgressCRUD.get_dashboard_data(db, current_user.id)
     return dashboard_data
 
@@ -190,7 +190,7 @@ async def get_user_completions(
 async def get_all_achievements(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> List[Dict[str, Any]]:
     achievements = await ProgressCRUD.get_all_achievements(db)
     user_achievements = await ProgressCRUD.get_user_achievements(db, current_user.id)
 
@@ -218,7 +218,7 @@ async def get_all_achievements(
 async def get_user_achievements(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> List[Dict[str, Any]]:
     user_achievements = await ProgressCRUD.get_user_achievements(db, current_user.id)
     achievements = await ProgressCRUD.get_all_achievements(db)
 
@@ -252,10 +252,11 @@ async def get_learning_streak(
     streak = await ProgressCRUD.get_learning_streak(db, current_user.id)
     if not streak:
         # Return default values if no streak exists
+        from datetime import datetime, timezone
         return LearningStreakResponse(
             current_streak=0,
             longest_streak=0,
             last_activity_date=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
     return streak

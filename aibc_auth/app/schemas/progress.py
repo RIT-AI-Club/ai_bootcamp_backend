@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from uuid import UUID
 
@@ -138,7 +138,7 @@ class UserProgressSummary(BaseModel):
 
 class DashboardData(BaseModel):
     user_id: UUID
-    pathways: List[Dict[str, any]]
+    pathways: List[Dict[str, Any]]
     summary: UserProgressSummary
     recent_achievements: List[UserAchievementResponse] = []
     streak: Optional[LearningStreakResponse] = None
