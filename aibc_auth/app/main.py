@@ -62,7 +62,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-app.include_router(progress.router, tags=["Progress"])
+app.include_router(progress.router, prefix="/api/v1/progress", tags=["Progress"])
 
 @app.get("/health")
 async def health_check():
