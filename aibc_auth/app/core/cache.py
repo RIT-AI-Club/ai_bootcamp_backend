@@ -29,9 +29,9 @@ class CacheManager:
             try:
                 # Create connection pool for production scalability
                 pool_kwargs = {
-                    "host": settings.redis_host,
-                    "port": settings.redis_port,
-                    "db": settings.redis_db,
+                    "host": settings.REDIS_HOST,
+                    "port": settings.REDIS_PORT,
+                    "db": settings.REDIS_DB,
                     "decode_responses": False,  # Handle binary data
                     "max_connections": 20,      # Production connection limit
                     "retry_on_timeout": True,
@@ -41,8 +41,8 @@ class CacheManager:
                 }
 
                 # Add password only if provided (production security)
-                if settings.redis_password:
-                    pool_kwargs["password"] = settings.redis_password
+                if settings.REDIS_PASSWORD:
+                    pool_kwargs["password"] = settings.REDIS_PASSWORD
 
                 # Add SSL support for production environments
                 if settings.ENVIRONMENT == "production":

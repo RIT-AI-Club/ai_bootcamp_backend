@@ -24,10 +24,10 @@ class Settings(BaseSettings):
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
 
     # Redis Cache Configuration
-    redis_host: str = "redis"  # Default to Docker service name
-    redis_port: int = 6379
-    redis_password: str = ""
-    redis_db: int = 0
+    REDIS_HOST: str = "redis"  # Default to Docker service name
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""
+    REDIS_DB: int = 0
 
     ENVIRONMENT: str = "development"
     
