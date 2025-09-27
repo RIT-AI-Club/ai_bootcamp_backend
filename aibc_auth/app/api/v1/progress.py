@@ -210,12 +210,15 @@ async def seed_basic_data(
         ('deep-learning', 'deep-learning', 'Deep Learning Foundations', 'Deep Learning', 'Sarah', 'from-purple-500 to-pink-500', 12);
         """
 
-        # Insert basic module data
+        # Insert AI Agents modules that are missing
         module_sql = """
-        INSERT INTO modules (id, pathway_id, title, description, module_number, estimated_duration_minutes) VALUES
-        ('ai-agents-1', 'ai-agents', 'Introduction to AI Agents', 'Learn the fundamentals of AI agents', 1, 45),
-        ('ai-agents-2', 'ai-agents', 'MCP Protocol Basics', 'Understanding Model Context Protocol', 2, 60),
-        ('deep-learning-1', 'deep-learning', 'Neural Network Basics', 'Introduction to neural networks', 1, 50);
+        INSERT INTO modules (id, pathway_id, title, description, order_index, duration_minutes) VALUES
+        ('agent-fundamentals', 'ai-agents', 'AI Agent Fundamentals', 'Understanding agent architectures and the foundations of autonomous AI systems.', 1, 50),
+        ('mcp-protocol', 'ai-agents', 'Model Context Protocol (MCP)', 'Deep dive into MCP for building standardized agent-tool interactions.', 2, 75),
+        ('tool-integration', 'ai-agents', 'Tool Integration & APIs', 'Connect agents with external services, databases, and APIs for expanded capabilities.', 3, 60),
+        ('multi-agent-systems', 'ai-agents', 'Multi-Agent Systems', 'Design and coordinate multiple agents working together on complex tasks.', 4, 80),
+        ('agent-deployment', 'ai-agents', 'Agent Deployment & Production', 'Deploy and scale AI agents in production environments.', 5, 90)
+        ON CONFLICT (id) DO NOTHING;
         """
 
         await db.execute(text(pathway_sql))

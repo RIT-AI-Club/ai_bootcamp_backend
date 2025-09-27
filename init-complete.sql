@@ -259,7 +259,14 @@ INSERT INTO modules (id, pathway_id, title, description, order_index, duration_m
 ('cv-object-detection', 'computer-vision', 'Object Detection', 'Implement modern object detection algorithms', 5, 120),
 ('cv-segmentation', 'computer-vision', 'Image Segmentation', 'Learn semantic and instance segmentation techniques', 6, 90),
 ('cv-face-recognition', 'computer-vision', 'Face Recognition', 'Build face detection and recognition systems', 7, 75),
-('cv-project', 'computer-vision', 'Capstone Project', 'Apply your knowledge in a real-world project', 8, 180)
+('cv-project', 'computer-vision', 'Capstone Project', 'Apply your knowledge in a real-world project', 8, 180),
+
+-- AI Agents pathway modules
+('agent-fundamentals', 'ai-agents', 'AI Agent Fundamentals', 'Understanding agent architectures and the foundations of autonomous AI systems.', 1, 50),
+('mcp-protocol', 'ai-agents', 'Model Context Protocol (MCP)', 'Deep dive into MCP for building standardized agent-tool interactions.', 2, 75),
+('tool-integration', 'ai-agents', 'Tool Integration & APIs', 'Connect agents with external services, databases, and APIs for expanded capabilities.', 3, 60),
+('multi-agent-systems', 'ai-agents', 'Multi-Agent Systems', 'Design and coordinate multiple agents working together on complex tasks.', 4, 80),
+('agent-deployment', 'ai-agents', 'Agent Deployment & Production', 'Deploy and scale AI agents in production environments.', 5, 90)
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert initial achievements
