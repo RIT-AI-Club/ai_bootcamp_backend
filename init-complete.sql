@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS learning_streaks (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for progress tracking performance
+-- Optimized indexes for progress tracking performance
 CREATE INDEX idx_user_progress_user_id ON user_progress(user_id);
 CREATE INDEX idx_user_progress_pathway_id ON user_progress(pathway_id);
 CREATE INDEX idx_module_completions_user_id ON module_completions(user_id);
@@ -224,6 +224,45 @@ CREATE INDEX idx_module_completions_module_id ON module_completions(module_id);
 CREATE INDEX idx_user_achievements_user_id ON user_achievements(user_id);
 CREATE INDEX idx_learning_streaks_user_id ON learning_streaks(user_id);
 CREATE INDEX idx_modules_pathway_id ON modules(pathway_id);
+
+-- Composite indexes for optimized queries
+CREATE INDEX idx_user_progress_composite ON user_progress(user_id, pathway_id);
+CREATE INDEX idx_module_completions_composite ON module_completions(user_id, pathway_id, completed_at);
+CREATE INDEX idx_user_achievements_composite ON user_achievements(user_id, earned_at DESC);
+CREATE INDEX idx_modules_pathway_order ON modules(pathway_id, order_index);
+
+-- Materialized view for user progress aggregations
+CREATE MATERIALIZED VIEW user_progress_summary AS
+SELECT
+    up.user_id,
+    COUNT(up.id) as pathways_started,
+    SUM(CASE WHEN up.progress_percentage = 100 THEN 1 ELSE 0 END) as pathways_completed,
+    SUM(up.total_time_spent_minutes) as total_time_spent,
+    COUNT(mc.id) as total_modules_completed
+FROM user_progress up
+LEFT JOIN module_completions mc ON up.user_id = mc.user_id
+GROUP BY up.user_id;
+
+-- Index for materialized view
+CREATE UNIQUE INDEX idx_user_progress_summary_user_id ON user_progress_summary(user_id);
+
+-- Function to refresh materialized view
+CREATE OR REPLACE FUNCTION refresh_user_progress_summary()
+RETURNS TRIGGER AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY user_progress_summary;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers to auto-refresh materialized view
+CREATE TRIGGER trigger_refresh_progress_summary_on_progress
+    AFTER INSERT OR UPDATE OR DELETE ON user_progress
+    FOR EACH STATEMENT EXECUTE FUNCTION refresh_user_progress_summary();
+
+CREATE TRIGGER trigger_refresh_progress_summary_on_completion
+    AFTER INSERT OR UPDATE OR DELETE ON module_completions
+    FOR EACH STATEMENT EXECUTE FUNCTION refresh_user_progress_summary();
 
 -- Trigger for updating pathway updated_at
 CREATE TRIGGER update_pathways_updated_at BEFORE UPDATE ON pathways

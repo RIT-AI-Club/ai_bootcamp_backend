@@ -1,8 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, and_, or_, func, desc
-from typing import Optional, List, Dict
+from sqlalchemy import select, update, and_, or_, func, desc, text
+from sqlalchemy.orm import selectinload, joinedload
+from typing import Optional, List, Dict, Tuple
 from datetime import datetime, date, timedelta
 from uuid import UUID
+import logging
 
 from app.models.progress import (
     Pathway, Module, UserProgress, ModuleCompletion,
@@ -11,22 +13,31 @@ from app.models.progress import (
 from app.schemas.progress import (
     UserProgressCreate, UserProgressUpdate, ModuleCompletionCreate
 )
+from app.core.cache import cached, invalidate_user_cache, invalidate_pathway_cache
+
+logger = logging.getLogger(__name__)
 
 class ProgressCRUD:
 
     # Pathway operations
     @staticmethod
+    @cached(expire=3600, key_prefix="pathways_all")
     async def get_all_pathways(db: AsyncSession) -> List[Pathway]:
+        """Get all pathways with 1-hour cache"""
         result = await db.execute(select(Pathway).order_by(Pathway.id))
         return result.scalars().all()
 
     @staticmethod
+    @cached(expire=3600, key_prefix="pathway_by_id")
     async def get_pathway_by_id(db: AsyncSession, pathway_id: str) -> Optional[Pathway]:
+        """Get pathway by ID with 1-hour cache"""
         result = await db.execute(select(Pathway).where(Pathway.id == pathway_id))
         return result.scalar_one_or_none()
 
     @staticmethod
+    @cached(expire=3600, key_prefix="pathway_by_slug")
     async def get_pathway_by_slug(db: AsyncSession, slug: str) -> Optional[Pathway]:
+        """Get pathway by slug with 1-hour cache"""
         result = await db.execute(select(Pathway).where(Pathway.slug == slug))
         return result.scalar_one_or_none()
 
@@ -186,6 +197,9 @@ class ProgressCRUD:
         # Check for achievements
         await ProgressCRUD.check_and_award_achievements(db, user_id)
 
+        # Invalidate user-specific cache
+        await invalidate_user_cache(str(user_id))
+
         return completion
 
     @staticmethod
@@ -325,61 +339,92 @@ class ProgressCRUD:
 
     # Dashboard data
     @staticmethod
+    @cached(expire=300, key_prefix="user_dashboard")
     async def get_dashboard_data(db: AsyncSession, user_id: UUID) -> Dict:
-        # Get all pathways with user progress
-        pathways = await ProgressCRUD.get_all_pathways(db)
-        user_progress_list = await ProgressCRUD.get_all_user_progress(db, user_id)
+        """Optimized dashboard data with single JOIN query and 5-minute cache"""
 
-        # Create progress map
-        progress_map = {p.pathway_id: p for p in user_progress_list}
+        # Single optimized query with JOINs - eliminates N+1 problem
+        pathway_progress_query = await db.execute(
+            select(
+                Pathway.id,
+                Pathway.slug,
+                Pathway.title,
+                Pathway.short_title,
+                Pathway.instructor,
+                Pathway.color,
+                func.coalesce(UserProgress.progress_percentage, 0).label('progress'),
+                func.coalesce(UserProgress.total_time_spent_minutes, 0).label('time_spent')
+            )
+            .outerjoin(
+                UserProgress,
+                and_(
+                    Pathway.id == UserProgress.pathway_id,
+                    UserProgress.user_id == user_id
+                )
+            )
+            .order_by(Pathway.id)
+        )
 
-        # Build pathway data with progress
         pathway_data = []
-        for pathway in pathways:
-            progress = progress_map.get(pathway.id)
+        pathways_started = 0
+        pathways_completed = 0
+        total_time = 0
+
+        for row in pathway_progress_query:
             pathway_dict = {
-                'id': pathway.id,
-                'slug': pathway.slug,
-                'title': pathway.title,
-                'shortTitle': pathway.short_title,
-                'instructor': pathway.instructor,
-                'color': pathway.color,
-                'progress': progress.progress_percentage if progress else 0
+                'id': row.id,
+                'slug': row.slug,
+                'title': row.title,
+                'shortTitle': row.short_title,
+                'instructor': row.instructor,
+                'color': row.color,
+                'progress': row.progress
             }
             pathway_data.append(pathway_dict)
 
-        # Get summary stats
-        total_modules_completed = await db.execute(
+            if row.progress > 0:
+                pathways_started += 1
+            if row.progress == 100:
+                pathways_completed += 1
+            total_time += row.time_spent
+
+        # Get module completions count in single query
+        modules_completed_result = await db.execute(
             select(func.count(ModuleCompletion.id))
             .where(ModuleCompletion.user_id == user_id)
         )
-        modules_count = total_modules_completed.scalar() or 0
+        modules_count = modules_completed_result.scalar() or 0
 
-        pathways_started = len(user_progress_list)
-        pathways_completed = sum(1 for p in user_progress_list if p.progress_percentage == 100)
-        total_time = sum(p.total_time_spent_minutes for p in user_progress_list)
-
-        # Get streak
+        # Get streak data
         streak = await ProgressCRUD.get_learning_streak(db, user_id)
 
-        # Get recent achievements
-        user_achievements = await db.execute(
-            select(UserAchievement, Achievement)
+        # Get recent achievements with single JOIN query
+        achievements_result = await db.execute(
+            select(
+                Achievement.id,
+                Achievement.name,
+                Achievement.description,
+                Achievement.icon,
+                Achievement.category,
+                UserAchievement.earned_at
+            )
             .join(Achievement, UserAchievement.achievement_id == Achievement.id)
             .where(UserAchievement.user_id == user_id)
             .order_by(desc(UserAchievement.earned_at))
             .limit(5)
         )
-        recent_achievements = []
-        for user_ach, ach in user_achievements:
-            recent_achievements.append({
-                'id': ach.id,
-                'name': ach.name,
-                'description': ach.description,
-                'icon': ach.icon,
-                'category': ach.category,
-                'earned_at': user_ach.earned_at.isoformat()
-            })
+
+        recent_achievements = [
+            {
+                'id': row.id,
+                'name': row.name,
+                'description': row.description,
+                'icon': row.icon,
+                'category': row.category,
+                'earned_at': row.earned_at.isoformat()
+            }
+            for row in achievements_result
+        ]
 
         return {
             'pathways': pathway_data,

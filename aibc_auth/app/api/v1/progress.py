@@ -237,6 +237,76 @@ async def seed_basic_data(
         logger.error(f"Error seeding data: {e}")
         return {"error": str(e)}
 
+@router.get("/user/dashboard-optimized")
+async def get_dashboard_complete(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Production-optimized single endpoint for complete dashboard data.
+    Eliminates multiple API calls by combining dashboard, summary, and pathway data.
+    Uses optimized JOIN queries and 5-minute caching.
+    """
+    try:
+        # Single call to optimized dashboard data
+        dashboard_data = await ProgressCRUD.get_dashboard_data(db, current_user.id)
+
+        # Add user summary for compatibility
+        user_summary = {
+            "user_id": current_user.id,
+            "total_pathways": len(dashboard_data["pathways"]),
+            "pathways_started": dashboard_data["summary"]["pathways_started"],
+            "pathways_completed": dashboard_data["summary"]["pathways_completed"],
+            "total_modules_completed": dashboard_data["summary"]["modules_completed"],
+            "total_time_spent_minutes": dashboard_data["summary"]["total_time_spent_minutes"],
+            "current_streak": dashboard_data["summary"]["current_streak"],
+            "longest_streak": dashboard_data["summary"]["longest_streak"],
+            "achievements_earned": len(dashboard_data["recent_achievements"]),
+            "pathway_progress": []  # Empty for performance, data already in pathways
+        }
+
+        return {
+            "dashboard": dashboard_data,
+            "summary": user_summary,
+            "pathways": dashboard_data["pathways"],  # Direct access for PathwayGrid
+            "achievements": dashboard_data["recent_achievements"],
+            "streak": dashboard_data["streak"]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching optimized dashboard: {e}")
+        # Return empty data structure on error
+        return {
+            "dashboard": {
+                "pathways": [],
+                "summary": {
+                    "pathways_started": 0,
+                    "pathways_completed": 0,
+                    "modules_completed": 0,
+                    "total_time_spent_minutes": 0,
+                    "current_streak": 0,
+                    "longest_streak": 0
+                },
+                "recent_achievements": [],
+                "streak": {"current": 0, "longest": 0, "last_activity": None}
+            },
+            "summary": {
+                "user_id": current_user.id,
+                "total_pathways": 0,
+                "pathways_started": 0,
+                "pathways_completed": 0,
+                "total_modules_completed": 0,
+                "total_time_spent_minutes": 0,
+                "current_streak": 0,
+                "longest_streak": 0,
+                "achievements_earned": 0,
+                "pathway_progress": []
+            },
+            "pathways": [],
+            "achievements": [],
+            "streak": {"current": 0, "longest": 0, "last_activity": None}
+        }
+
 @router.post("/user/start-pathway", response_model=UserProgressResponse)
 async def start_pathway(
     progress_data: UserProgressCreate,

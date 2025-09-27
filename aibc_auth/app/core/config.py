@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
-    
+
+    # Redis Cache Configuration
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_password: str = ""
+    redis_db: int = 0
+
     ENVIRONMENT: str = "development"
     
     def get_cors_origins(self) -> List[str]:
