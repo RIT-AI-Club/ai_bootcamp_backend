@@ -112,7 +112,7 @@ async def update_resource_completion(
         values["notes"] = notes
 
     if metadata is not None:
-        values["metadata"] = metadata
+        values["completion_metadata"] = metadata
 
     await db.execute(
         update(ResourceCompletion)

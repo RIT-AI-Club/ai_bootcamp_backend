@@ -104,6 +104,51 @@ async def get_module_resources(
             detail="Failed to fetch module resources"
         )
 
+@router.get("/modules/{module_id}/resources-with-progress", response_model=List[ResourceWithProgress])
+async def get_module_resources_with_progress(
+    module_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all resources for a module WITH user progress and submissions (optimized single query)"""
+    try:
+        # Get all resources for the module
+        resources = await resource_crud.get_resources_by_module(db, module_id)
+
+        if not resources:
+            return []
+
+        # Build response with progress for each resource
+        resources_with_progress = []
+        for resource in resources:
+            # Get user's completion status
+            completion = await resource_crud.get_resource_completion(
+                db, current_user.id, resource.id
+            )
+
+            # Get submissions if resource requires upload
+            submissions = []
+            if resource.requires_upload:
+                submissions = await resource_crud.get_submissions_for_resource(
+                    db, current_user.id, resource.id
+                )
+
+            resource_dict = ResourceResponse.model_validate(resource)
+            resources_with_progress.append(ResourceWithProgress(
+                **resource_dict.model_dump(),
+                completion=ResourceCompletionResponse.model_validate(completion) if completion else None,
+                submissions=[ResourceSubmissionResponse.model_validate(s) for s in submissions]
+            ))
+
+        return resources_with_progress
+
+    except Exception as e:
+        logger.error(f"Error fetching module resources with progress: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch module resources with progress"
+        )
+
 # ============================================================================
 # Progress Tracking Endpoints
 # ============================================================================

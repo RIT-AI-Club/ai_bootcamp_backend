@@ -30,7 +30,7 @@ class Resource(Base):
     url = Column(Text)
 
     # Metadata (quiz questions, exercise instructions, etc.)
-    metadata = Column(JSONB)
+    resource_metadata = Column('metadata', JSONB)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -66,7 +66,7 @@ class ResourceCompletion(Base):
 
     # User notes and metadata
     notes = Column(Text)
-    metadata = Column(JSONB)
+    completion_metadata = Column('metadata', JSONB)
 
     __table_args__ = (
         CheckConstraint("status IN ('not_started', 'in_progress', 'completed', 'submitted', 'reviewed')"),
@@ -107,7 +107,7 @@ class ResourceSubmission(Base):
     deleted_at = Column(DateTime(timezone=True))
 
     # Additional metadata
-    resource_metadata = Column('metadata', JSONB)
+    submission_metadata = Column('metadata', JSONB)
 
     __table_args__ = (
         CheckConstraint("submission_status IN ('uploading', 'uploaded', 'processing', 'approved', 'rejected', 'failed')"),
