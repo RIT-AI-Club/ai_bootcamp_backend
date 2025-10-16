@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 import sys
+import json
+import os
 from app.api.v1 import auth, users, progress
 from app.core.config import settings
 from app.db.database import engine, create_tables
@@ -15,11 +17,33 @@ from app.core.security import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
-)
+# Cloud Run optimized logging (structured JSON for Cloud Logging)
+IS_CLOUD_RUN = os.getenv("K_SERVICE") is not None
+
+if IS_CLOUD_RUN:
+    # Structured logging for Google Cloud Logging
+    class JSONFormatter(logging.Formatter):
+        def format(self, record):
+            log_obj = {
+                "severity": record.levelname,
+                "message": record.getMessage(),
+                "timestamp": self.formatTime(record, self.datefmt),
+                "logger": record.name,
+            }
+            if record.exc_info:
+                log_obj["exception"] = self.formatException(record.exc_info)
+            return json.dumps(log_obj)
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JSONFormatter())
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
+else:
+    # Human-readable logging for local development
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        stream=sys.stdout
+    )
 
 logger = logging.getLogger(__name__)
 

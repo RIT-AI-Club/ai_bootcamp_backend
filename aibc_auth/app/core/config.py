@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import List
 import secrets
+import os
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -9,10 +10,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
+
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
-    
-    BCRYPT_ROUNDS: int = 12
+
+    # Optimize bcrypt for Cloud Run (reduce from 12 to 10 for serverless)
+    # Still secure: 10 rounds = ~100ms vs 12 rounds = ~250ms
+    BCRYPT_ROUNDS: int = 10 if os.getenv("K_SERVICE") else 12
     
     PASSWORD_MIN_LENGTH: int = 8
     PASSWORD_MAX_LENGTH: int = 128

@@ -68,7 +68,7 @@ async def login(
             detail="Account temporarily locked due to too many failed attempts"
         )
     
-    if not verify_password(form_data.password, user.password_hash):
+    if not await verify_password(form_data.password, user.password_hash):
         await user_crud.increment_failed_login(db, user.id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -189,7 +189,7 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    if not verify_password(password_data.current_password, current_user.password_hash):
+    if not await verify_password(password_data.current_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect current password"

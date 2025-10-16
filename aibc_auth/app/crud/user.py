@@ -8,7 +8,7 @@ from app.core.security import get_password_hash, hash_token
 from app.core.config import settings
 
 async def create_user(db: AsyncSession, email: str, full_name: str, password: str) -> User:
-    hashed_password = get_password_hash(password)
+    hashed_password = await get_password_hash(password)
     user = User(
         email=email.lower(),
         full_name=full_name,
@@ -117,7 +117,7 @@ async def revoke_all_user_tokens(db: AsyncSession, user_id: UUID):
     await db.commit()
 
 async def update_user_password(db: AsyncSession, user_id: UUID, new_password: str):
-    hashed_password = get_password_hash(new_password)
+    hashed_password = await get_password_hash(new_password)
     await db.execute(
         update(User)
         .where(User.id == user_id)

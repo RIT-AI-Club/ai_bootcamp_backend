@@ -10,6 +10,8 @@ from app.db.database import get_db
 from app.models.user import User
 import secrets
 import hashlib
+import asyncio
+from functools import partial
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -18,11 +20,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 limiter = Limiter(key_func=get_remote_address)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+# Async wrappers for bcrypt (prevents blocking the event loop)
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Async password verification - runs bcrypt in thread pool to prevent blocking"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        partial(pwd_context.verify, plain_password, hashed_password)
+    )
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+async def get_password_hash(password: str) -> str:
+    """Async password hashing - runs bcrypt in thread pool to prevent blocking"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        partial(pwd_context.hash, password)
+    )
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
