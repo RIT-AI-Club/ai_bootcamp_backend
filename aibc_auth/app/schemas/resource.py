@@ -18,7 +18,7 @@ class ResourceBase(BaseModel):
     max_file_size_mb: int = 50
     allow_resubmission: bool = True
     url: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = Field(None, alias='resource_metadata')
 
 class ResourceResponse(ResourceBase):
     id: str
@@ -29,6 +29,7 @@ class ResourceResponse(ResourceBase):
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # ============================================================================
 # Resource Completion Schemas
@@ -66,10 +67,11 @@ class ResourceCompletionResponse(BaseModel):
     submission_required: bool
     submission_count: int
     notes: Optional[str]
-    metadata: Optional[Dict[str, Any]]
+    metadata: Optional[Dict[str, Any]] = Field(None, alias='completion_metadata')
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # ============================================================================
 # Resource Submission Schemas
@@ -90,9 +92,11 @@ class ResourceSubmissionResponse(BaseModel):
     grade: Optional[str]
     created_at: datetime
     updated_at: datetime
+    metadata: Optional[Dict[str, Any]] = Field(None, alias='submission_metadata')
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 class SubmissionReviewRequest(BaseModel):
     submission_status: str = Field(..., pattern='^(approved|rejected)$')
