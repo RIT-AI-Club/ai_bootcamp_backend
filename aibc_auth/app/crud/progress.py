@@ -13,7 +13,6 @@ from app.models.progress import (
 from app.schemas.progress import (
     UserProgressCreate, UserProgressUpdate, ModuleCompletionCreate
 )
-from app.core.cache import cached, invalidate_user_cache, invalidate_pathway_cache
 
 logger = logging.getLogger(__name__)
 
@@ -21,21 +20,18 @@ class ProgressCRUD:
 
     # Pathway operations
     @staticmethod
-    @cached(expire=3600, key_prefix="pathways_all")
     async def get_all_pathways(db: AsyncSession) -> List[Pathway]:
         """Get all pathways with 1-hour cache"""
         result = await db.execute(select(Pathway).order_by(Pathway.id))
         return result.scalars().all()
 
     @staticmethod
-    @cached(expire=3600, key_prefix="pathway_by_id")
     async def get_pathway_by_id(db: AsyncSession, pathway_id: str) -> Optional[Pathway]:
         """Get pathway by ID with 1-hour cache"""
         result = await db.execute(select(Pathway).where(Pathway.id == pathway_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    @cached(expire=3600, key_prefix="pathway_by_slug")
     async def get_pathway_by_slug(db: AsyncSession, slug: str) -> Optional[Pathway]:
         """Get pathway by slug with 1-hour cache"""
         result = await db.execute(select(Pathway).where(Pathway.slug == slug))
@@ -197,9 +193,6 @@ class ProgressCRUD:
         # Check for achievements
         await ProgressCRUD.check_and_award_achievements(db, user_id)
 
-        # Invalidate user-specific cache
-        await invalidate_user_cache(str(user_id))
-
         return completion
 
     @staticmethod
@@ -339,7 +332,6 @@ class ProgressCRUD:
 
     # Dashboard data
     @staticmethod
-    @cached(expire=300, key_prefix="user_dashboard")
     async def get_dashboard_data(db: AsyncSession, user_id: UUID) -> Dict:
         """Optimized dashboard data with single JOIN query and 5-minute cache"""
 

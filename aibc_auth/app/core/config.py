@@ -23,12 +23,6 @@ class Settings(BaseSettings):
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
 
-    # Redis Cache Configuration
-    REDIS_HOST: str = "redis"  # Default to Docker service name
-    REDIS_PORT: int = 6379
-    REDIS_PASSWORD: str = ""
-    REDIS_DB: int = 0
-
     ENVIRONMENT: str = "development"
     
     def get_cors_origins(self) -> List[str]:
