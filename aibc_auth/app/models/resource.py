@@ -107,7 +107,7 @@ class ResourceSubmission(Base):
     deleted_at = Column(DateTime(timezone=True))
 
     # Additional metadata
-    metadata = Column(JSONB)
+    resource_metadata = Column('metadata', JSONB)
 
     __table_args__ = (
         CheckConstraint("submission_status IN ('uploading', 'uploaded', 'processing', 'approved', 'rejected', 'failed')"),
