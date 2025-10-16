@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:postgresql://localhost:5432/aibc_db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="Akash_AI_Club" uuid="6682ae6c-10d4-4da9-bd0d-75830f21ecc7">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://provider.bdl.computer:32276/aibc_db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>
