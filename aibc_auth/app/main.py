@@ -7,12 +7,13 @@ import logging
 import sys
 import json
 import os
-from app.api.v1 import auth, users, progress
+from app.api.v1 import auth, users, progress, resources
 from app.core.config import settings
 from app.db.database import engine, create_tables
 # Import models to ensure they're registered with SQLAlchemy
 from app.models.user import User
 from app.models.progress import Pathway, Module, UserProgress, ModuleCompletion, Achievement, UserAchievement, LearningStreak
+from app.models.resource import Resource, ResourceCompletion, ResourceSubmission
 from app.core.security import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -87,6 +88,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(progress.router, prefix="/api/v1/progress", tags=["Progress"])
+app.include_router(resources.router, prefix="/api/v1/resources", tags=["Resources"])
 
 @app.get("/health")
 async def health_check():

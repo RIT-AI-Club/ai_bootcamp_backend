@@ -477,13 +477,34 @@ aibc-submissions/
 
 ---
 
+## Configuration & Policy
+
+### File Management Policies
+- **Retention**: Files stored **permanently** in GCS (no automatic deletion)
+- **Max File Size**: **50 MB** per file (configurable per resource type)
+- **Resubmission**: ✅ **Allowed** - Students can re-upload after rejection
+- **Storage**: Google Cloud Storage with structured paths
+
+### Grading System
+- **Format**: Simple **pass/fail** binary grading
+- **Reviews**: Instructors provide grade + optional text comments
+- **Notifications**: Email notifications **not implemented** (future enhancement)
+
+### Quiz System
+- **Storage**: Questions/answers stored in `resources.metadata` JSONB field
+- **Format**: Matches `Quiz.tsx` component structure (see frontend)
+- **Scoring**: Client-side calculation, results stored in `resource_completions.metadata`
+- **Passing Score**: Configurable per quiz (default 70%)
+
+---
+
 ## Security Considerations
 
 1. **File Upload Security**
    - Validate file types via MIME type AND magic bytes
    - Scan uploads for malware (Cloud Security Scanner)
-   - Limit file sizes (10-25 MB depending on resource)
-   - Generate unique filenames to prevent overwriting
+   - Limit file sizes (50 MB max, configurable per resource)
+   - Generate unique filenames with timestamps to prevent overwriting
 
 2. **Access Control**
    - Users can only upload to their own resources
@@ -496,7 +517,8 @@ aibc-submissions/
    - Max 100 MB total uploads per user per day
 
 4. **Data Privacy**
-   - Soft delete submissions (never hard delete)
+   - Soft delete submissions (never hard delete, set `deleted_at`)
+   - Files kept forever unless explicitly deleted by admin
    - Anonymize user data on account deletion
    - Audit log all file access
 

@@ -546,15 +546,61 @@ The migration script includes sample data for:
 
 ---
 
-## Questions for Discussion
+## Configuration Decisions ✅
 
-1. **File retention policy**: How long should we keep uploaded files? (30 days? Forever?)
-2. **Review workflow**: Should students be notified when submissions reviewed?
-3. **Re-submission policy**: Can students re-upload after "rejected" status?
-4. **Grading system**: Simple pass/fail or numeric scores (0-100)?
-5. **Quiz implementation**: Store quiz questions in `resources.metadata` JSONB?
-6. **Time tracking**: Should frontend track video watch time automatically?
-7. **XP/Points system**: Integrate with existing achievements table?
+### File Management
+- **File Retention**: ✅ **Keep forever** - No automatic deletion, files stored permanently in GCS
+- **Re-submission**: ✅ **Allowed** - Students can re-upload after "rejected" status (`allow_resubmission = TRUE`)
+- **Max File Size**: ✅ **50 MB** - Global maximum with per-resource configuration
+- **File Storage**: All files stored in Google Cloud Storage with structured paths
+
+### Grading & Review
+- **Grading System**: ✅ **Pass/Fail** - Simple binary grading (`grade VARCHAR(10) CHECK (grade IN ('pass', 'fail', NULL))`)
+- **Email Notifications**: ❌ **Not Implemented** - No email notifications for reviews (future enhancement if needed)
+- **Review Comments**: Instructors can add text comments with pass/fail decision
+
+### Quiz Implementation
+- **Quiz Storage**: ✅ **JSONB metadata** - Quiz questions/answers stored in `resources.metadata` field
+- **Quiz Format**: Matches existing `Quiz.tsx` component structure exactly:
+  ```json
+  {
+    "title": "Quiz Title",
+    "description": "Quiz description",
+    "passingScore": 70,
+    "questions": [
+      {
+        "id": "q1",
+        "type": "multiple-choice" | "true-false",
+        "question": "Question text",
+        "options": [
+          {"id": "a", "text": "Option text", "isCorrect": true|false}
+        ],
+        "explanation": "Explanation text"
+      }
+    ]
+  }
+  ```
+- **Quiz Scoring**: Calculated client-side by `Quiz.tsx` component, results stored in `resource_completions.metadata`
+
+### Progress Tracking
+- **Time Tracking**: Frontend responsible for tracking video watch time and exercise duration
+- **XP/Points**: Can integrate with existing `achievements` table (future enhancement)
+- **Automatic Updates**: Database triggers handle all progress calculations automatically
+
+---
+
+## Implementation Status
+
+### ✅ Phase 1-2: Design Complete
+- [x] Database schema with 3 tables + triggers
+- [x] Quiz metadata format matching `Quiz.tsx` component
+- [x] API endpoint design with all CRUD operations
+- [x] GCS integration architecture
+- [x] Sample data for image-generation and prompt-engineering pathways
+- [x] Configuration decisions documented
+
+### 🔄 Next: Phase 3-6 Implementation
+Ready to implement backend models, CRUD operations, FastAPI endpoints, and GCS integration.
 
 ---
 
