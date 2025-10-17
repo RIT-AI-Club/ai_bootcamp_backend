@@ -2,8 +2,28 @@
 
 # AI Bootcamp Backend - Simple Cloud Run Deployment Script
 # This script handles everything: Docker build, push, and Terraform deploy
+#
+# Usage:
+#   ./deploy.sh                    # Full deployment with env vars
+#   ./deploy.sh --skip-env-update  # Only update image, keep existing env vars
 
 set -e
+
+# Parse arguments
+SKIP_ENV_UPDATE=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-env-update)
+            SKIP_ENV_UPDATE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: ./deploy.sh [--skip-env-update]"
+            exit 1
+            ;;
+    esac
+done
 
 # Colors for pretty output
 RED='\033[0;31m'
@@ -150,8 +170,17 @@ build_image() {
 setup_artifact_registry() {
     print_status "Setting up Artifact Registry..."
 
-    # Check if repository exists
-    if gcloud artifacts repositories describe "${SERVICE_NAME}" \
+    # Ensure Artifact Registry API is enabled
+    print_status "Checking Artifact Registry API..."
+    if ! gcloud services list --enabled --project="${PROJECT_ID}" --filter="name:artifactregistry.googleapis.com" --format="value(name)" 2>/dev/null | grep -q "artifactregistry"; then
+        print_status "Enabling Artifact Registry API..."
+        gcloud services enable artifactregistry.googleapis.com --project="${PROJECT_ID}"
+        sleep 5  # Wait for API to be fully enabled
+    fi
+
+    # Check if repository exists with timeout
+    print_status "Checking for existing repository..."
+    if timeout 30 gcloud artifacts repositories describe "${SERVICE_NAME}" \
         --location="${REGION}" \
         --project="${PROJECT_ID}" &> /dev/null; then
         print_success "Artifact Registry repository already exists"
@@ -191,13 +220,39 @@ deploy_terraform() {
 
     cd "${SCRIPT_DIR}/terraform"
 
+    # Unset GOOGLE_APPLICATION_CREDENTIALS for local Terraform (use gcloud ADC instead)
+    unset GOOGLE_APPLICATION_CREDENTIALS
+
     # Initialize Terraform
     print_status "Initializing Terraform..."
     terraform init -upgrade
 
     # Create terraform.tfvars
     print_status "Creating terraform.tfvars..."
-    cat > terraform.tfvars <<EOF
+
+    if [ "$SKIP_ENV_UPDATE" = true ]; then
+        print_warning "Skipping environment variable updates (--skip-env-update flag set)"
+        print_warning "Only updating image. Existing env vars in Cloud Run will be preserved."
+        cat > terraform.tfvars <<EOF
+project_id              = "${PROJECT_ID}"
+region                  = "${REGION}"
+service_name            = "${SERVICE_NAME}"
+image_url               = "${IMAGE_TAG}"
+database_url            = "placeholder-will-be-ignored"
+jwt_secret_key          = "placeholder-will-be-ignored"
+jwt_refresh_secret_key  = "placeholder-will-be-ignored"
+session_secret_key      = "placeholder-will-be-ignored"
+cors_origins            = "placeholder-will-be-ignored"
+google_client_id        = ""
+google_client_secret    = ""
+min_instances           = ${MIN_INSTANCES:-1}
+max_instances           = ${MAX_INSTANCES:-10}
+cpu                     = "${CPU:-1}"
+memory                  = "${MEMORY:-512Mi}"
+allow_unauthenticated   = ${ALLOW_UNAUTHENTICATED:-true}
+EOF
+    else
+        cat > terraform.tfvars <<EOF
 project_id              = "${PROJECT_ID}"
 region                  = "${REGION}"
 service_name            = "${SERVICE_NAME}"
@@ -215,6 +270,7 @@ cpu                     = "${CPU:-1}"
 memory                  = "${MEMORY:-512Mi}"
 allow_unauthenticated   = ${ALLOW_UNAUTHENTICATED:-true}
 EOF
+    fi
 
     # Plan
     print_status "Planning Terraform changes..."
