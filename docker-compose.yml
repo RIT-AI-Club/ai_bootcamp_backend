@@ -31,6 +31,7 @@ services:
       - ./aibc_auth/.env
     environment:
       - DATABASE_URL=postgresql://aibc_admin:AIbc2024SecurePass@postgres:5432/aibc_db
+      - PORT=8000
     ports:
       - "8000:8000"
     depends_on:
