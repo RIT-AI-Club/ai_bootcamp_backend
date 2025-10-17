@@ -4,11 +4,13 @@ AI Bootcamp Admin Dashboard - Submission Grading Tool
 Simple Flask app for instructors to review and grade student submissions
 """
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template_string, request, jsonify, redirect, url_for
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
+from google.cloud import storage
+from google.oauth2 import service_account
 
 # Load environment from parent directory
 load_dotenv('/home/roman/ai_bootcamp_backend/aibc_auth/.env')
@@ -21,9 +23,51 @@ DB_URL = os.getenv('DATABASE_URL', 'postgresql://aibc_admin:AIbc2024SecurePass@l
 # Replace 'postgres' with 'localhost' for local connection
 DB_URL = DB_URL.replace('postgres:', 'localhost:')
 
+# Google Cloud Storage setup
+GCS_BUCKET = os.getenv('GCS_BUCKET_NAME', 'aibc-submissions')
+GCS_PROJECT = os.getenv('GCS_PROJECT_ID', 'ai-bootcamp-475320')
+GCS_KEY_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '/home/roman/ai_bootcamp_backend/aibc_auth/gcs-key.json')
+
+def get_gcs_client():
+    """Get GCS client"""
+    try:
+        credentials = service_account.Credentials.from_service_account_file(GCS_KEY_PATH)
+        return storage.Client(credentials=credentials, project=GCS_PROJECT)
+    except Exception as e:
+        print(f"Warning: GCS not configured: {e}")
+        return None
+
 def get_db():
     """Get database connection"""
     return psycopg2.connect(DB_URL)
+
+def generate_signed_url(gcs_path):
+    """Generate signed URL for GCS file download"""
+    try:
+        # Extract blob path from gs:// URL
+        if gcs_path.startswith('gs://'):
+            blob_path = gcs_path.replace(f'gs://{GCS_BUCKET}/', '')
+        else:
+            blob_path = gcs_path
+
+        client = get_gcs_client()
+        if not client:
+            return None
+
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(blob_path)
+
+        # Generate signed URL valid for 1 hour
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(hours=1),
+            method="GET"
+        )
+
+        return signed_url
+    except Exception as e:
+        print(f"Error generating signed URL: {e}")
+        return None
 
 # =============================================================================
 # HTML TEMPLATES (embedded for single-file simplicity)
@@ -37,80 +81,124 @@ INDEX_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Submission Grading</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            background: #0a0a0a;
             min-height: 100vh;
             padding: 20px;
+            color: #00ff41;
         }
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            background: #0f0f0f;
+            border-radius: 4px;
+            border: 1px solid #00ff41;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.1);
             overflow: hidden;
         }
         header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #000;
+            color: #00ff41;
             padding: 30px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid #00ff41;
         }
-        h1 { font-size: 28px; font-weight: 700; }
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+        }
+        h1::before { content: '> '; color: #00ff41; }
         .stats {
             display: flex;
             gap: 20px;
             padding: 20px 40px;
-            background: #f8f9fa;
-            border-bottom: 2px solid #e9ecef;
+            background: #000;
+            border-bottom: 1px solid #1a1a1a;
         }
         .stat-card {
-            background: white;
+            background: #0a0a0a;
             padding: 15px 25px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-radius: 4px;
+            border: 1px solid #1a1a1a;
             flex: 1;
+            transition: all 0.2s;
         }
-        .stat-number { font-size: 32px; font-weight: 700; color: #667eea; }
-        .stat-label { font-size: 13px; color: #6c757d; margin-top: 5px; }
+        .stat-card:hover {
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+        }
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #00ff41;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
         .filters {
             padding: 20px 40px;
-            background: #fff;
-            border-bottom: 1px solid #e9ecef;
+            background: #000;
+            border-bottom: 1px solid #1a1a1a;
             display: flex;
             gap: 15px;
             align-items: center;
         }
         select, input {
             padding: 10px 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 14px;
+            border: 1px solid #1a1a1a;
+            border-radius: 2px;
+            font-size: 13px;
+            background: #0a0a0a;
+            color: #00ff41;
+            font-family: 'JetBrains Mono', monospace;
             outline: none;
             transition: all 0.2s;
         }
-        select:hover, input:hover { border-color: #667eea; }
-        select:focus, input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        select:hover, input:hover {
+            border-color: #00ff41;
+            box-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
+        }
+        select:focus, input:focus {
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+        }
         .submissions {
             padding: 20px 40px;
             max-height: 600px;
             overflow-y: auto;
+            background: #000;
         }
+        .submissions::-webkit-scrollbar { width: 8px; }
+        .submissions::-webkit-scrollbar-track { background: #0a0a0a; }
+        .submissions::-webkit-scrollbar-thumb {
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+        .submissions::-webkit-scrollbar-thumb:hover { background: #00ff41; }
         .submission-card {
-            background: #fff;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
             padding: 20px;
             margin-bottom: 15px;
             transition: all 0.2s;
         }
         .submission-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 12px rgba(102,126,234,0.15);
+            border-color: #00ff41;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
         }
         .submission-header {
             display: flex;
@@ -118,87 +206,160 @@ INDEX_TEMPLATE = """
             align-items: start;
             margin-bottom: 15px;
         }
-        .student-info h3 { font-size: 18px; color: #212529; margin-bottom: 5px; }
-        .student-info p { font-size: 14px; color: #6c757d; }
-        .resource-title { font-size: 15px; color: #495057; font-weight: 600; margin-top: 5px; }
+        .student-info h3 {
+            font-size: 16px;
+            color: #00ff41;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+        .student-info h3::before { content: '// '; color: #666; }
+        .student-info p {
+            font-size: 12px;
+            color: #666;
+        }
+        .resource-title {
+            font-size: 13px;
+            color: #888;
+            font-weight: 500;
+            margin-top: 5px;
+        }
         .submission-meta {
             display: flex;
             gap: 20px;
             margin: 15px 0;
-            font-size: 13px;
-            color: #6c757d;
+            font-size: 11px;
+            color: #666;
         }
-        .meta-item { display: flex; align-items: center; gap: 5px; }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .meta-item::before { content: '['; color: #00ff41; }
+        .meta-item::after { content: ']'; color: #00ff41; }
         .badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 2px;
+            font-size: 10px;
             font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid;
         }
-        .badge-pending { background: #fff3cd; color: #856404; }
-        .badge-uploaded { background: #d1ecf1; color: #0c5460; }
-        .badge-approved { background: #d4edda; color: #155724; }
-        .badge-rejected { background: #f8d7da; color: #721c24; }
+        .badge-pending { background: #1a1a00; color: #ffff00; border-color: #ffff00; }
+        .badge-uploaded { background: #001a1a; color: #00ffff; border-color: #00ffff; }
+        .badge-approved { background: #001a00; color: #00ff41; border-color: #00ff41; }
+        .badge-rejected { background: #1a0000; color: #ff0000; border-color: #ff0000; }
         .actions {
             display: flex;
             gap: 10px;
             margin-top: 15px;
         }
         .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid;
+            border-radius: 2px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
             text-decoration: none;
             display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
+        .btn:hover {
+            box-shadow: 0 0 10px;
+            transform: translateY(-1px);
+        }
+        .btn-primary {
+            background: #001a1a;
+            color: #00ffff;
+            border-color: #00ffff;
+        }
+        .btn-primary:hover { box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+        .btn-success {
+            background: #001a00;
+            color: #00ff41;
+            border-color: #00ff41;
+        }
+        .btn-success:hover { box-shadow: 0 0 10px rgba(0, 255, 65, 0.5); }
+        .btn-danger {
+            background: #1a0000;
+            color: #ff0000;
+            border-color: #ff0000;
+        }
+        .btn-danger:hover { box-shadow: 0 0 10px rgba(255, 0, 0, 0.5); }
+        .btn-secondary {
+            background: #0a0a0a;
+            color: #666;
+            border-color: #333;
+        }
+        .btn-secondary:hover {
+            color: #00ff41;
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
         .review-form {
             margin-top: 15px;
             padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: #000;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
             display: none;
         }
         .review-form.active { display: block; }
         textarea {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: inherit;
+            border: 1px solid #1a1a1a;
+            border-radius: 2px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
             resize: vertical;
             min-height: 80px;
             outline: none;
         }
-        textarea:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        textarea:focus {
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
         .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 13px; font-weight: 600; color: #495057; margin-bottom: 5px; }
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #00ff41;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        label::before { content: '> '; }
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #6c757d;
+            color: #666;
         }
-        .empty-state h3 { font-size: 20px; margin-bottom: 10px; }
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #00ff41;
+        }
         .file-info {
-            background: #e9ecef;
+            background: #000;
+            border: 1px solid #1a1a1a;
             padding: 10px 15px;
-            border-radius: 8px;
+            border-radius: 2px;
             margin: 10px 0;
-            font-size: 13px;
+            font-size: 11px;
+            color: #666;
         }
         .waiting-time {
-            font-size: 13px;
-            color: #dc3545;
+            font-size: 11px;
+            color: #ff0000;
             font-weight: 600;
         }
     </style>
@@ -206,8 +367,8 @@ INDEX_TEMPLATE = """
 <body>
     <div class="container">
         <header>
-            <h1>📚 Submission Grading Dashboard</h1>
-            <div style="font-size: 14px; opacity: 0.9;">AI Bootcamp Admin</div>
+            <h1>SUBMISSION_GRADING_SYS</h1>
+            <div style="font-size: 11px; color: #666; letter-spacing: 2px;">AIBC://ADMIN_TERMINAL</div>
         </header>
 
         <div class="stats">
@@ -287,7 +448,7 @@ INDEX_TEMPLATE = """
                     {% endif %}
 
                     <div class="actions">
-                        <a href="{{ sub.gcs_url }}" target="_blank" class="btn btn-primary">Download File</a>
+                        <button class="btn btn-primary" onclick="downloadFile('{{ sub.id }}', '{{ sub.gcs_path }}')">Download File</button>
                         {% if sub.submission_status == 'uploaded' %}
                         <button class="btn btn-secondary" onclick="toggleReviewForm('{{ sub.id }}')">Review</button>
                         {% endif %}
@@ -326,6 +487,22 @@ INDEX_TEMPLATE = """
     </div>
 
     <script>
+        function downloadFile(submissionId, gcsPath) {
+            // Get signed URL from backend
+            fetch('/api/download/' + submissionId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.signed_url) {
+                        window.open(data.signed_url, '_blank');
+                    } else {
+                        alert('Failed to generate download link: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    alert('Failed to download file: ' + error);
+                });
+        }
+
         function toggleReviewForm(id) {
             const form = document.getElementById('review-' + id);
             form.classList.toggle('active');
@@ -407,6 +584,7 @@ def index():
             rs.file_size_bytes,
             rs.file_type,
             rs.gcs_url,
+            rs.gcs_path,
             rs.submission_status,
             rs.grade,
             rs.review_comments,
@@ -455,6 +633,38 @@ def index():
         stats=stats or {'total_pending': 0, 'total_uploaded': 0, 'avg_wait_hours': 0},
         pathways=pathways
     )
+
+@app.route('/api/download/<submission_id>')
+def download_file(submission_id):
+    """Generate signed URL for file download"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        # Get submission's GCS path
+        cur.execute("""
+            SELECT gcs_path, gcs_url, file_name
+            FROM resource_submissions
+            WHERE id = %s
+        """, (submission_id,))
+
+        submission = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not submission:
+            return jsonify({'error': 'Submission not found'}), 404
+
+        # Generate signed URL
+        signed_url = generate_signed_url(submission['gcs_path'] or submission['gcs_url'])
+
+        if signed_url:
+            return jsonify({'signed_url': signed_url, 'file_name': submission['file_name']})
+        else:
+            return jsonify({'error': 'Failed to generate download link'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/review/<submission_id>', methods=['POST'])
 def review_submission(submission_id):
