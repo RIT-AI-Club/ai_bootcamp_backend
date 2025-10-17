@@ -31,11 +31,13 @@ http://localhost:5000
 3. **Grading** - Instructors can approve (pass/fail) or reject for revision
 4. **Updates Status** - Changes `submission_status` and adds feedback
 
-## Database Access
+## Database & Storage Access
 
 Uses environment variables from `/home/roman/ai_bootcamp_backend/aibc_auth/.env`:
 - `DATABASE_URL` - PostgreSQL connection string
 - Automatically replaces `postgres:` with `localhost:` for local access
+- `GCS_BUCKET_NAME`, `GCS_PROJECT_ID` - Google Cloud Storage config
+- GCS credentials auto-resolved from `../aibc_auth/gcs-key.json` (no hardcoded paths!)
 
 ## API Endpoints
 

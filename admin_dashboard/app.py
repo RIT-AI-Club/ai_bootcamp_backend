@@ -26,15 +26,50 @@ DB_URL = DB_URL.replace('postgres:', 'localhost:')
 # Google Cloud Storage setup
 GCS_BUCKET = os.getenv('GCS_BUCKET_NAME', 'aibc-submissions')
 GCS_PROJECT = os.getenv('GCS_PROJECT_ID', 'ai-bootcamp-475320')
-GCS_KEY_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '/home/roman/ai_bootcamp_backend/aibc_auth/gcs-key.json')
+
+def get_gcs_credentials_path():
+    """
+    Get GCS credentials path with intelligent fallback
+    Matches pattern from aibc_auth/app/core/gcs.py
+    """
+    # First, try environment variable (for Cloud Run: /app/gcs-key.json)
+    env_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')
+
+    if env_path and os.path.exists(env_path):
+        return env_path
+
+    # Second, try relative path from admin_dashboard directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    relative_path = os.path.join(script_dir, '..', 'aibc_auth', 'gcs-key.json')
+
+    if os.path.exists(relative_path):
+        return os.path.abspath(relative_path)
+
+    # Third, try current directory (for Docker if mounted)
+    current_dir_path = os.path.join(os.getcwd(), 'gcs-key.json')
+    if os.path.exists(current_dir_path):
+        return current_dir_path
+
+    return None
 
 def get_gcs_client():
-    """Get GCS client"""
+    """
+    Get GCS client with credential fallback
+    Matches pattern from aibc_auth/app/core/gcs.py
+    """
     try:
-        credentials = service_account.Credentials.from_service_account_file(GCS_KEY_PATH)
-        return storage.Client(credentials=credentials, project=GCS_PROJECT)
+        credentials_path = get_gcs_credentials_path()
+
+        if credentials_path:
+            # Use service account credentials (local development)
+            credentials = service_account.Credentials.from_service_account_file(credentials_path)
+            return storage.Client(credentials=credentials, project=GCS_PROJECT)
+        else:
+            # Use default credentials (Cloud Run with workload identity)
+            return storage.Client(project=GCS_PROJECT)
+
     except Exception as e:
-        print(f"Warning: GCS not configured: {e}")
+        print(f"Warning: GCS client initialization failed: {e}")
         return None
 
 def get_db():
@@ -215,11 +250,11 @@ INDEX_TEMPLATE = """
         .student-info h3::before { content: '// '; color: #666; }
         .student-info p {
             font-size: 12px;
-            color: #666;
+            color: #999;
         }
         .resource-title {
             font-size: 13px;
-            color: #888;
+            color: #aaa;
             font-weight: 500;
             margin-top: 5px;
         }
@@ -355,7 +390,10 @@ INDEX_TEMPLATE = """
             border-radius: 2px;
             margin: 10px 0;
             font-size: 11px;
-            color: #666;
+            color: #888;
+        }
+        .file-info strong {
+            color: #00ff41;
         }
         .waiting-time {
             font-size: 11px;
@@ -381,7 +419,7 @@ INDEX_TEMPLATE = """
                 <div class="stat-label">Uploaded Today</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">{{ stats.avg_wait_hours|round(1) }}h</div>
+                <div class="stat-number">{{ (stats.avg_wait_hours|round(1)) if stats.avg_wait_hours else 0 }}h</div>
                 <div class="stat-label">Avg Wait Time</div>
             </div>
         </div>
@@ -442,8 +480,8 @@ INDEX_TEMPLATE = """
                     </div>
 
                     {% if sub.review_comments %}
-                    <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 8px; font-size: 13px;">
-                        <strong>Previous Feedback:</strong> {{ sub.review_comments }}
+                    <div style="margin-top: 10px; padding: 12px; background: #1a1a00; border: 1px solid #ffff00; border-radius: 4px; font-size: 12px; color: #ffff00;">
+                        <strong style="color: #ffff00;">Previous Feedback:</strong> {{ sub.review_comments }}
                     </div>
                     {% endif %}
 
