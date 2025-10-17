@@ -57,12 +57,11 @@ load_env() {
     source "$ENV_FILE"
     set +a
 
-    # Validate required variables
+    # Validate required variables (DATABASE_URL will be set manually in Cloud Run)
     REQUIRED_VARS=(
         "PROJECT_ID"
         "REGION"
         "SERVICE_NAME"
-        "DATABASE_URL"
         "JWT_SECRET_KEY"
         "JWT_REFRESH_SECRET_KEY"
         "SESSION_SECRET_KEY"
@@ -74,6 +73,12 @@ load_env() {
             exit 1
         fi
     done
+
+    # Warn about DATABASE_URL if it contains placeholder text
+    if [ -z "$DATABASE_URL" ] || [[ "$DATABASE_URL" == *"CHANGE_ME"* ]] || [[ "$DATABASE_URL" == *"PROJECT:REGION:INSTANCE"* ]]; then
+        print_warning "DATABASE_URL appears to have placeholder values"
+        print_warning "Remember to update DATABASE_URL in Cloud Run console after deployment"
+    fi
 
     print_success "Environment variables loaded"
 }
