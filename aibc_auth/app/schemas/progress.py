@@ -39,6 +39,7 @@ class ModuleResponse(ModuleBase):
 class ModuleWithCompletion(ModuleResponse):
     completed: bool = False
     completed_at: Optional[datetime] = None
+    approval_status: Optional[str] = None  # pending, approved, rejected
 
 # User Progress schemas
 class UserProgressBase(BaseModel):
@@ -80,9 +81,17 @@ class ModuleCompletionResponse(BaseModel):
     module_id: str
     completed_at: datetime
     time_spent_minutes: int
+    approval_status: str = 'pending'
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    review_comments: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+class ModuleApprovalRequest(BaseModel):
+    approval_status: str = Field(..., pattern='^(approved|rejected)$')
+    review_comments: Optional[str] = None
 
 # Achievement schemas
 class AchievementBase(BaseModel):

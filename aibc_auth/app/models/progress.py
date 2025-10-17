@@ -57,6 +57,16 @@ class ModuleCompletion(Base):
     completed_at = Column(DateTime(timezone=True), server_default=func.now())
     time_spent_minutes = Column(Integer, default=0)
 
+    # Instructor approval fields
+    approval_status = Column(String(50), default='pending')
+    reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at = Column(DateTime(timezone=True))
+    review_comments = Column(Text)
+
+    __table_args__ = (
+        CheckConstraint("approval_status IN ('pending', 'approved', 'rejected')"),
+    )
+
 class Achievement(Base):
     __tablename__ = "achievements"
 

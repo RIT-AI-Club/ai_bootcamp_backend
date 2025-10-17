@@ -18,6 +18,7 @@ from app.schemas.progress import (
     UserProgressUpdate,
     ModuleCompletionCreate,
     ModuleCompletionResponse,
+    ModuleApprovalRequest,
     PathwayProgressResponse,
     UserProgressSummary,
     DashboardData,
@@ -63,13 +64,14 @@ async def get_pathway_progress(
 
     # Get user's module completions
     completions = await ProgressCRUD.get_module_completions(db, current_user.id, pathway.id)
-    completion_set = {c.module_id for c in completions}
+    completion_map = {c.module_id: c for c in completions}
 
-    # Build modules with completion status
+    # Build modules with completion status and approval status
     modules_with_completion = []
     next_module = None
     for module in modules:
-        completed = module.id in completion_set
+        completion = completion_map.get(module.id)
+        completed = completion is not None
         module_dict = ModuleWithCompletion(
             id=module.id,
             pathway_id=module.pathway_id,
@@ -79,13 +81,16 @@ async def get_pathway_progress(
             duration_minutes=module.duration_minutes,
             created_at=module.created_at,
             updated_at=module.updated_at,
-            completed=completed
+            completed=completed,
+            completed_at=completion.completed_at if completion else None,
+            approval_status=completion.approval_status if completion else None
         )
         modules_with_completion.append(module_dict)
 
-        # Find next module to complete
-        if not completed and not next_module:
-            next_module = module
+        # Find next module to complete (only approved ones count as complete)
+        if not completed or (completion and completion.approval_status != 'approved'):
+            if not next_module:
+                next_module = module
 
     return PathwayProgressResponse(
         pathway=pathway,
@@ -349,6 +354,8 @@ async def mark_module_complete(
     current_user: User = Depends(get_current_user)
 ):
     try:
+        from app.crud import resource as resource_crud
+
         logger.info(f"Attempting to mark module complete: {completion_data.module_id} for user: {current_user.id}")
 
         # Verify module exists
@@ -363,9 +370,46 @@ async def mark_module_complete(
             logger.warning(f"Pathway not found: {completion_data.pathway_id}")
             raise HTTPException(status_code=404, detail=f"Pathway not found: {completion_data.pathway_id}")
 
-        # Mark as complete
+        # VALIDATION: Check all resources are completed
+        resources = await resource_crud.get_resources_by_module(db, completion_data.module_id)
+
+        if resources:  # Only validate if module has resources
+            completions = await resource_crud.get_user_completions_for_module(db, current_user.id, completion_data.module_id)
+            completion_map = {c.resource_id: c for c in completions}
+
+            # Check each resource
+            incomplete_resources = []
+            missing_uploads = []
+
+            for resource in resources:
+                completion = completion_map.get(resource.id)
+
+                # Check if resource is completed
+                if not completion or completion.status not in ['completed', 'submitted', 'reviewed']:
+                    incomplete_resources.append(resource.title)
+                    continue
+
+                # Check if upload is required and submitted
+                if resource.requires_upload and completion.submission_count == 0:
+                    missing_uploads.append(resource.title)
+
+            if incomplete_resources:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot complete module: The following resources must be completed first: {', '.join(incomplete_resources)}"
+                )
+
+            if missing_uploads:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot complete module: The following resources require file submission: {', '.join(missing_uploads)}"
+                )
+
+            logger.info(f"All {len(resources)} resources completed for module {completion_data.module_id}")
+
+        # Mark as complete (will be in 'pending' approval status by default)
         completion = await ProgressCRUD.mark_module_complete(db, current_user.id, completion_data)
-        logger.info(f"Module marked complete successfully: {completion.id}")
+        logger.info(f"Module marked complete (pending review): {completion.id}")
         return completion
 
     except HTTPException:
@@ -382,6 +426,148 @@ async def get_user_completions(
 ):
     completions = await ProgressCRUD.get_module_completions(db, current_user.id, pathway_id)
     return completions
+
+@router.post("/modules/{completion_id}/approve", response_model=ModuleCompletionResponse)
+async def approve_module_completion(
+    completion_id: UUID,
+    approval_request: ModuleApprovalRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin endpoint to approve or reject a module completion.
+    Requires admin/instructor role.
+    """
+    try:
+        from datetime import datetime, timezone
+        from sqlalchemy import update, select
+        from app.models.progress import ModuleCompletion
+
+        # TODO: Add admin role check when role system is implemented
+        # For now, any authenticated user can approve (will be restricted later)
+
+        # Get the completion record
+        result = await db.execute(
+            select(ModuleCompletion).where(ModuleCompletion.id == completion_id)
+        )
+        completion = result.scalar_one_or_none()
+
+        if not completion:
+            raise HTTPException(status_code=404, detail="Module completion not found")
+
+        # Update approval status
+        await db.execute(
+            update(ModuleCompletion)
+            .where(ModuleCompletion.id == completion_id)
+            .values(
+                approval_status=approval_request.approval_status,
+                reviewed_by=current_user.id,
+                reviewed_at=datetime.now(timezone.utc),
+                review_comments=approval_request.review_comments
+            )
+        )
+        await db.commit()
+
+        # Fetch updated completion
+        result = await db.execute(
+            select(ModuleCompletion).where(ModuleCompletion.id == completion_id)
+        )
+        updated_completion = result.scalar_one()
+
+        logger.info(f"Module completion {completion_id} {approval_request.approval_status} by {current_user.email}")
+
+        return ModuleCompletionResponse.model_validate(updated_completion)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error approving module completion: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update approval status")
+
+@router.get("/modules/pending-reviews")
+async def get_pending_module_reviews(
+    pathway_id: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Admin endpoint to get all pending module reviews.
+    Returns modules waiting for instructor approval.
+    """
+    try:
+        from sqlalchemy import select, func, and_
+        from app.models.progress import ModuleCompletion, Module, Pathway
+        from app.models.user import User as UserModel
+
+        # TODO: Add admin role check
+
+        # Build query for pending reviews
+        query = (
+            select(
+                ModuleCompletion.id,
+                ModuleCompletion.user_id,
+                UserModel.email.label('user_email'),
+                UserModel.full_name.label('user_name'),
+                ModuleCompletion.pathway_id,
+                Pathway.title.label('pathway_title'),
+                ModuleCompletion.module_id,
+                Module.title.label('module_title'),
+                ModuleCompletion.completed_at,
+                func.extract('epoch', func.now() - ModuleCompletion.completed_at).label('seconds_waiting')
+            )
+            .join(UserModel, ModuleCompletion.user_id == UserModel.id)
+            .join(Pathway, ModuleCompletion.pathway_id == Pathway.id)
+            .join(Module, ModuleCompletion.module_id == Module.id)
+            .where(
+                and_(
+                    ModuleCompletion.approval_status == 'pending',
+                    ModuleCompletion.completed_at.isnot(None)
+                )
+            )
+        )
+
+        if pathway_id:
+            query = query.where(ModuleCompletion.pathway_id == pathway_id)
+
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await db.execute(count_query)
+        total_pending = count_result.scalar()
+
+        # Get paginated results
+        query = query.order_by(ModuleCompletion.completed_at.asc()).limit(limit).offset(offset)
+        result = await db.execute(query)
+        rows = result.fetchall()
+
+        # Format results
+        pending_reviews = []
+        for row in rows:
+            pending_reviews.append({
+                'id': str(row.id),
+                'user_id': str(row.user_id),
+                'user_email': row.user_email,
+                'user_name': row.user_name or 'Unknown',
+                'pathway_id': row.pathway_id,
+                'pathway_title': row.pathway_title,
+                'module_id': row.module_id,
+                'module_title': row.module_title,
+                'completed_at': row.completed_at.isoformat(),
+                'hours_waiting': row.seconds_waiting / 3600.0 if row.seconds_waiting else 0
+            })
+
+        return {
+            'total_pending': total_pending,
+            'reviews': pending_reviews,
+            'limit': limit,
+            'offset': offset
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching pending reviews: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pending reviews")
 
 # Achievement endpoints
 @router.get("/achievements")

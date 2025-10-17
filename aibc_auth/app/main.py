@@ -2,16 +2,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
 import logging
 import sys
 import json
 import os
-from app.api.v1 import auth, users, progress, resources
+from app.api.v1 import auth, users, progress, resources, oauth
 from app.core.config import settings
 from app.db.database import engine, create_tables
 # Import models to ensure they're registered with SQLAlchemy
-from app.models.user import User
+from app.models.user import User, OAuthAccount
 from app.models.progress import Pathway, Module, UserProgress, ModuleCompletion, Achievement, UserAchievement, LearningStreak
 from app.models.resource import Resource, ResourceCompletion, ResourceSubmission
 from app.core.security import limiter
@@ -64,6 +65,14 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Session middleware for OAuth (must be added before other middleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET_KEY,
+    max_age=3600,  # 1 hour
+    https_only=False  # Set to True in production with HTTPS
+)
+
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"]
@@ -85,6 +94,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"}
     )
 
+app.include_router(oauth.router, prefix="/api/v1/auth", tags=["OAuth"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(progress.router, prefix="/api/v1/progress", tags=["Progress"])
