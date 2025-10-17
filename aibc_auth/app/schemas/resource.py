@@ -36,7 +36,7 @@ class ResourceResponse(ResourceBase):
 # ============================================================================
 
 class ResourceCompletionCreate(BaseModel):
-    resource_id: str
+    resource_id: Optional[str] = None  # Optional since endpoint uses path parameter
     notes: Optional[str] = None
 
 class ResourceCompletionUpdate(BaseModel):
