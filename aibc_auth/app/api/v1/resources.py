@@ -285,6 +285,82 @@ async def complete_resource(
             detail="Failed to complete resource"
         )
 
+
+@router.delete("/users/me/resources/{resource_id}/complete", response_model=ResourceCompletionResponse)
+@limiter.limit("100/minute")
+async def uncomplete_resource(
+    request: Request,
+    resource_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Unmark a resource as completed (for videos and articles only).
+    Cannot unmark if module is submitted, approved, or rejected.
+    """
+    try:
+        # Get the resource to check its type
+        resource = await resource_crud.get_resource_by_id(db, resource_id)
+        if not resource:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resource {resource_id} not found"
+            )
+
+        # Only allow unmarking for videos and articles (no uploads/quizzes)
+        if resource.type not in ['video', 'article']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot unmark resource of type '{resource.type}'. Only videos and articles can be unmarked."
+            )
+
+        # Check if module has been submitted/approved/rejected
+        module_completion = await resource_crud.get_module_completion(
+            db, current_user.id, resource.module_id
+        )
+
+        if module_completion:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot unmark resource. Module has been submitted for review or already reviewed."
+            )
+
+        # Get completion record
+        completion = await resource_crud.get_resource_completion(db, current_user.id, resource_id)
+
+        if not completion:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource is not marked as completed"
+            )
+
+        if completion.status not in ['completed', 'reviewed']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Resource is not completed (current status: {completion.status})"
+            )
+
+        # Update to in_progress status
+        updated = await resource_crud.update_resource_completion(
+            db,
+            completion.id,
+            status='in_progress',
+            progress_percentage=0,
+            completed_at=None
+        )
+
+        logger.info(f"User {current_user.email} unmarked resource {resource_id} as completed")
+        return ResourceCompletionResponse.model_validate(updated)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unmarking resource: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to unmark resource"
+        )
+
 # ============================================================================
 # File Upload Endpoints
 # ============================================================================

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 from uuid import UUID
 from app.models.resource import Resource, ResourceCompletion, ResourceSubmission
-from app.models.progress import Module
+from app.models.progress import Module, ModuleCompletion
 from app.models.user import User
 
 # ============================================================================
@@ -89,7 +89,8 @@ async def update_resource_completion(
     progress_percentage: Optional[int] = None,
     time_spent_minutes: Optional[int] = None,
     notes: Optional[str] = None,
-    metadata: Optional[dict] = None
+    metadata: Optional[dict] = None,
+    completed_at: Optional[datetime] = ...,  # Use ellipsis to distinguish None from "not provided"
 ) -> ResourceCompletion:
     """Update an existing resource completion record"""
     values = {
@@ -101,6 +102,10 @@ async def update_resource_completion(
         if status in ['completed', 'submitted', 'reviewed']:
             values["completed_at"] = datetime.now(timezone.utc)
             values["progress_percentage"] = 100
+
+    # Allow explicitly setting completed_at to None (for unmarking)
+    if completed_at is not ...:
+        values["completed_at"] = completed_at
 
     if progress_percentage is not None:
         values["progress_percentage"] = progress_percentage
@@ -325,3 +330,24 @@ async def get_pending_submissions(
         submissions.append(submission_dict)
 
     return total_count, submissions
+
+
+# ============================================================================
+# Module Completion Operations
+# ============================================================================
+
+async def get_module_completion(
+    db: AsyncSession,
+    user_id: UUID,
+    module_id: str
+) -> Optional[ModuleCompletion]:
+    """Get a user's module completion record"""
+    result = await db.execute(
+        select(ModuleCompletion).where(
+            and_(
+                ModuleCompletion.user_id == user_id,
+                ModuleCompletion.module_id == module_id
+            )
+        )
+    )
+    return result.scalar_one_or_none()
