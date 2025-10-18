@@ -709,9 +709,22 @@ def review_submission(submission_id):
     """Review and grade a submission"""
     data = request.json
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
+        # Get submission details to find the module and user
+        cur.execute("""
+            SELECT rs.user_id, rs.resource_id, r.module_id, r.requires_upload
+            FROM resource_submissions rs
+            JOIN resources r ON rs.resource_id = r.id
+            WHERE rs.id = %s
+        """, (submission_id,))
+        submission = cur.fetchone()
+
+        if not submission:
+            return jsonify({'success': False, 'message': 'Submission not found'}), 404
+
+        # Update the submission
         cur.execute("""
             UPDATE resource_submissions
             SET submission_status = %s,
@@ -727,6 +740,85 @@ def review_submission(submission_id):
             submission_id
         ))
 
+        # AUTO-APPROVE MODULE LOGIC: Check if all resources in the module are now approved
+        if data['submission_status'] == 'approved':
+            module_id = submission['module_id']
+            user_id = submission['user_id']
+
+            print(f"[AUTO-APPROVE] Checking module {module_id} for user {user_id}")
+
+            # Check if user has pending module completion
+            cur.execute("""
+                SELECT id FROM module_completions
+                WHERE user_id = %s AND module_id = %s AND approval_status = 'pending'
+            """, (user_id, module_id))
+            module_completion = cur.fetchone()
+
+            if module_completion:
+                print(f"[AUTO-APPROVE] Found pending module completion: {module_completion['id']}")
+
+                # Get all resources for the module
+                cur.execute("""
+                    SELECT id, title, requires_upload
+                    FROM resources
+                    WHERE module_id = %s
+                """, (module_id,))
+                module_resources = cur.fetchall()
+
+                print(f"[AUTO-APPROVE] Module has {len(module_resources)} resources")
+
+                # Check if ALL resources are approved
+                all_approved = True
+                for resource in module_resources:
+                    # Check if resource completion exists
+                    cur.execute("""
+                        SELECT status FROM resource_completions
+                        WHERE user_id = %s AND resource_id = %s
+                    """, (user_id, resource['id']))
+                    completion = cur.fetchone()
+
+                    if not completion or completion['status'] not in ('completed', 'submitted', 'reviewed'):
+                        print(f"[AUTO-APPROVE] Resource {resource['title']} - no completion or wrong status")
+                        all_approved = False
+                        break
+
+                    # If resource requires upload, check if submission is approved
+                    if resource['requires_upload']:
+                        cur.execute("""
+                            SELECT submission_status
+                            FROM resource_submissions
+                            WHERE user_id = %s AND resource_id = %s AND deleted_at IS NULL
+                            ORDER BY created_at DESC
+                            LIMIT 1
+                        """, (user_id, resource['id']))
+                        latest_submission = cur.fetchone()
+
+                        if not latest_submission or latest_submission['submission_status'] != 'approved':
+                            status = latest_submission['submission_status'] if latest_submission else 'none'
+                            print(f"[AUTO-APPROVE] Resource {resource['title']} - submission not approved: {status}")
+                            all_approved = False
+                            break
+
+                        print(f"[AUTO-APPROVE] Resource {resource['title']} - submission approved ✓")
+                    else:
+                        print(f"[AUTO-APPROVE] Resource {resource['title']} - completed (no upload required) ✓")
+
+                # If all resources approved, auto-approve the module
+                if all_approved:
+                    print(f"[AUTO-APPROVE] All resources approved! Auto-approving module {module_id}")
+                    cur.execute("""
+                        UPDATE module_completions
+                        SET approval_status = 'approved',
+                            reviewed_at = NOW(),
+                            updated_at = NOW()
+                        WHERE id = %s
+                    """, (module_completion['id'],))
+                    print(f"[AUTO-APPROVE] Module {module_id} auto-approved for user {user_id}!")
+                else:
+                    print(f"[AUTO-APPROVE] Not all resources approved yet")
+            else:
+                print(f"[AUTO-APPROVE] No pending module completion found")
+
         conn.commit()
         cur.close()
         conn.close()
@@ -734,6 +826,7 @@ def review_submission(submission_id):
         return jsonify({'success': True, 'message': 'Review submitted successfully'})
 
     except Exception as e:
+        print(f"[ERROR] Review submission failed: {e}")
         conn.rollback()
         cur.close()
         conn.close()

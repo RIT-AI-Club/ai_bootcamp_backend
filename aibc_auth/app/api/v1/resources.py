@@ -499,6 +499,144 @@ async def delete_submission(
             detail="Failed to delete submission"
         )
 
+@router.post("/admin/modules/{module_id}/check-auto-approve")
+async def check_module_auto_approve(
+    module_id: str,
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Manual endpoint to check if a module should be auto-approved.
+    Useful for retroactively approving modules where submissions were approved before auto-approval logic existed.
+    """
+    try:
+        from sqlalchemy import select, update
+        from app.models.progress import ModuleCompletion
+
+        logger.info(f"Manual auto-approval check for module {module_id}, user {user_id}")
+
+        # Get the user's module completion (if exists and is pending)
+        result = await db.execute(
+            select(ModuleCompletion)
+            .where(
+                ModuleCompletion.user_id == user_id,
+                ModuleCompletion.module_id == module_id,
+                ModuleCompletion.approval_status == 'pending'
+            )
+        )
+        module_completion = result.scalar_one_or_none()
+
+        if not module_completion:
+            return {
+                "message": "No pending module completion found",
+                "module_id": module_id,
+                "user_id": str(user_id),
+                "action": "none"
+            }
+
+        logger.info(f"Found pending module completion {module_completion.id}")
+
+        # Get all resources for the module
+        module_resources = await resource_crud.get_resources_by_module(db, module_id)
+        logger.info(f"Module has {len(module_resources)} resources")
+
+        # Get user's completions for all module resources
+        user_completions = await resource_crud.get_user_completions_for_module(db, user_id, module_id)
+        completion_map = {c.resource_id: c for c in user_completions}
+        logger.info(f"User has {len(user_completions)} resource completions")
+
+        # Check if ALL resources are approved
+        all_resources_approved = True
+        resource_statuses = []
+
+        for res in module_resources:
+            completion = completion_map.get(res.id)
+
+            status_info = {
+                "resource_id": res.id,
+                "title": res.title,
+                "requires_upload": res.requires_upload,
+                "completion_status": completion.status if completion else None,
+                "approved": False
+            }
+
+            # Must have completion record
+            if not completion or completion.status not in ['completed', 'submitted', 'reviewed']:
+                logger.info(f"Resource {res.id} ({res.title}) - missing completion or wrong status: {completion.status if completion else 'None'}")
+                all_resources_approved = False
+                status_info["issue"] = f"Missing completion or wrong status: {completion.status if completion else 'None'}"
+                resource_statuses.append(status_info)
+                continue
+
+            # If resource requires upload, check if latest submission is approved
+            if res.requires_upload:
+                submissions = await resource_crud.get_submissions_for_resource(db, user_id, res.id)
+                if not submissions:
+                    logger.info(f"Resource {res.id} ({res.title}) - no submissions found")
+                    all_resources_approved = False
+                    status_info["issue"] = "No submissions found"
+                    resource_statuses.append(status_info)
+                    continue
+
+                if submissions[0].submission_status != 'approved':
+                    logger.info(f"Resource {res.id} ({res.title}) - submission not approved: {submissions[0].submission_status}")
+                    all_resources_approved = False
+                    status_info["submission_status"] = submissions[0].submission_status
+                    status_info["issue"] = f"Submission not approved: {submissions[0].submission_status}"
+                    resource_statuses.append(status_info)
+                    continue
+
+                logger.info(f"Resource {res.id} ({res.title}) - submission approved")
+                status_info["submission_status"] = "approved"
+                status_info["approved"] = True
+            else:
+                logger.info(f"Resource {res.id} ({res.title}) - completed (no upload required)")
+                status_info["approved"] = True
+
+            resource_statuses.append(status_info)
+
+        # If all resources are approved, auto-approve the module
+        if all_resources_approved:
+            logger.info(f"All resources approved! Auto-approving module {module_id}")
+            await db.execute(
+                update(ModuleCompletion)
+                .where(ModuleCompletion.id == module_completion.id)
+                .values(
+                    approval_status='approved',
+                    reviewed_by=current_user.id,
+                    reviewed_at=datetime.now(timezone.utc)
+                )
+            )
+            await db.commit()
+            logger.info(f"Auto-approved module {module_id} for user {user_id} - all resources approved")
+
+            return {
+                "message": "Module auto-approved!",
+                "module_id": module_id,
+                "user_id": str(user_id),
+                "action": "approved",
+                "resource_statuses": resource_statuses
+            }
+        else:
+            logger.info(f"Not all resources approved yet for module {module_id}")
+            return {
+                "message": "Not all resources are approved yet",
+                "module_id": module_id,
+                "user_id": str(user_id),
+                "action": "none",
+                "resource_statuses": resource_statuses
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking module auto-approval: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to check module auto-approval"
+        )
+
 # ============================================================================
 # Instructor Review Endpoints
 # ============================================================================
@@ -548,6 +686,14 @@ async def review_submission(
                 detail="Submission not found"
             )
 
+        # Get the resource to find its module
+        resource = await resource_crud.get_resource_by_id(db, submission.resource_id)
+        if not resource:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Associated resource not found"
+            )
+
         # Update submission with review
         updated = await resource_crud.update_submission_review(
             db,
@@ -559,6 +705,85 @@ async def review_submission(
         )
 
         logger.info(f"Instructor {current_user.email} reviewed submission {submission_id}: {review.grade}")
+
+        # AUTO-APPROVE MODULE LOGIC: Check if all resources in the module are now approved
+        if review.submission_status == 'approved':
+            from sqlalchemy import select, update
+            from app.models.progress import ModuleCompletion
+
+            logger.info(f"Checking auto-approval for module {resource.module_id}, user {submission.user_id}")
+
+            # Get the user's module completion (if exists and is pending)
+            result = await db.execute(
+                select(ModuleCompletion)
+                .where(
+                    ModuleCompletion.user_id == submission.user_id,
+                    ModuleCompletion.module_id == resource.module_id,
+                    ModuleCompletion.approval_status == 'pending'
+                )
+            )
+            module_completion = result.scalar_one_or_none()
+
+            if not module_completion:
+                logger.info(f"No pending module completion found for module {resource.module_id}, user {submission.user_id}")
+            else:
+                logger.info(f"Found pending module completion {module_completion.id}")
+
+                # Get all resources for the module
+                module_resources = await resource_crud.get_resources_by_module(db, resource.module_id)
+                logger.info(f"Module has {len(module_resources)} resources")
+
+                # Get user's completions for all module resources
+                user_completions = await resource_crud.get_user_completions_for_module(
+                    db, submission.user_id, resource.module_id
+                )
+                completion_map = {c.resource_id: c for c in user_completions}
+                logger.info(f"User has {len(user_completions)} resource completions")
+
+                # Check if ALL resources are approved
+                all_resources_approved = True
+                for res in module_resources:
+                    completion = completion_map.get(res.id)
+
+                    # Must have completion record
+                    if not completion or completion.status not in ['completed', 'submitted', 'reviewed']:
+                        logger.info(f"Resource {res.id} ({res.title}) - missing completion or wrong status: {completion.status if completion else 'None'}")
+                        all_resources_approved = False
+                        break
+
+                    # If resource requires upload, check if latest submission is approved
+                    if res.requires_upload:
+                        submissions = await resource_crud.get_submissions_for_resource(
+                            db, submission.user_id, res.id
+                        )
+                        if not submissions:
+                            logger.info(f"Resource {res.id} ({res.title}) - no submissions found")
+                            all_resources_approved = False
+                            break
+                        if submissions[0].submission_status != 'approved':
+                            logger.info(f"Resource {res.id} ({res.title}) - submission not approved: {submissions[0].submission_status}")
+                            all_resources_approved = False
+                            break
+                        logger.info(f"Resource {res.id} ({res.title}) - submission approved")
+                    else:
+                        logger.info(f"Resource {res.id} ({res.title}) - completed (no upload required)")
+
+                # If all resources are approved, auto-approve the module
+                if all_resources_approved:
+                    logger.info(f"All resources approved! Auto-approving module {resource.module_id}")
+                    await db.execute(
+                        update(ModuleCompletion)
+                        .where(ModuleCompletion.id == module_completion.id)
+                        .values(
+                            approval_status='approved',
+                            reviewed_by=current_user.id,
+                            reviewed_at=datetime.now(timezone.utc)
+                        )
+                    )
+                    await db.commit()
+                    logger.info(f"Auto-approved module {resource.module_id} for user {submission.user_id} - all resources approved")
+                else:
+                    logger.info(f"Not all resources approved yet for module {resource.module_id}")
 
         return ResourceSubmissionResponse.model_validate(updated)
 
