@@ -124,3 +124,11 @@ async def update_user_password(db: AsyncSession, user_id: UUID, new_password: st
         .values(password_hash=hashed_password)
     )
     await db.commit()
+
+async def mark_onboarding_complete(db: AsyncSession, user_id: UUID):
+    await db.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(onboarding_completed=True)
+    )
+    await db.commit()

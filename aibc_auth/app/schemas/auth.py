@@ -33,7 +33,8 @@ class UserResponse(BaseModel):
     email_verified: bool
     created_at: datetime
     account_status: str
-    
+    onboarding_completed: bool = False
+
     class Config:
         from_attributes = True
 

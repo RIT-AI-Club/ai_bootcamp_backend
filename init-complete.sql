@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMP WITH TIME ZONE,
     account_status VARCHAR(50) DEFAULT 'active' CHECK (account_status IN ('active', 'suspended', 'deleted')),
     failed_login_attempts INTEGER DEFAULT 0,
-    locked_until TIMESTAMP WITH TIME ZONE
+    locked_until TIMESTAMP WITH TIME ZONE,
+    onboarding_completed BOOLEAN DEFAULT FALSE
 );
 
 -- Refresh tokens table for JWT management
