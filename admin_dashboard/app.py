@@ -809,8 +809,7 @@ def review_submission(submission_id):
                     cur.execute("""
                         UPDATE module_completions
                         SET approval_status = 'approved',
-                            reviewed_at = NOW(),
-                            updated_at = NOW()
+                            reviewed_at = NOW()
                         WHERE id = %s
                     """, (module_completion['id'],))
                     print(f"[AUTO-APPROVE] Module {module_id} auto-approved for user {user_id}!")
