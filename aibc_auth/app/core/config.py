@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     SESSION_SECRET_KEY: str = secrets.token_urlsafe(32)
 
+    # Frontend URL for OAuth redirects
+    FRONTEND_URL: str = "http://localhost:3000"
+
     # Optimize bcrypt for Cloud Run (reduce from 12 to 10 for serverless)
     # Still secure: 10 rounds = ~100ms vs 12 rounds = ~250ms
     BCRYPT_ROUNDS: int = 10 if os.getenv("K_SERVICE") else 12

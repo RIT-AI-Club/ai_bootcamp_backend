@@ -46,30 +46,44 @@ resource "google_cloud_run_v2_service" "auth_service" {
         container_port = 8080
       }
 
-      # Environment variables
+      # Environment variables (only set if provided)
       env {
         name  = "ENVIRONMENT"
         value = "production"
       }
 
-      env {
-        name  = "DATABASE_URL"
-        value = var.database_url
+      # Only set DATABASE_URL if provided (not empty/placeholder)
+      dynamic "env" {
+        for_each = var.database_url != "" && var.database_url != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "DATABASE_URL"
+          value = var.database_url
+        }
       }
 
-      env {
-        name  = "JWT_SECRET_KEY"
-        value = var.jwt_secret_key
+      # Only set JWT secrets if provided
+      dynamic "env" {
+        for_each = var.jwt_secret_key != "" && var.jwt_secret_key != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "JWT_SECRET_KEY"
+          value = var.jwt_secret_key
+        }
       }
 
-      env {
-        name  = "JWT_REFRESH_SECRET_KEY"
-        value = var.jwt_refresh_secret_key
+      dynamic "env" {
+        for_each = var.jwt_refresh_secret_key != "" && var.jwt_refresh_secret_key != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "JWT_REFRESH_SECRET_KEY"
+          value = var.jwt_refresh_secret_key
+        }
       }
 
-      env {
-        name  = "SESSION_SECRET_KEY"
-        value = var.session_secret_key
+      dynamic "env" {
+        for_each = var.session_secret_key != "" && var.session_secret_key != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SESSION_SECRET_KEY"
+          value = var.session_secret_key
+        }
       }
 
       env {
@@ -87,14 +101,18 @@ resource "google_cloud_run_v2_service" "auth_service" {
         value = "7"
       }
 
-      env {
-        name  = "CORS_ORIGINS"
-        value = var.cors_origins
+      # Only set CORS if provided
+      dynamic "env" {
+        for_each = var.cors_origins != "" && var.cors_origins != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "CORS_ORIGINS"
+          value = var.cors_origins
+        }
       }
 
       # Google OAuth (optional)
       dynamic "env" {
-        for_each = var.google_client_id != "" ? [1] : []
+        for_each = var.google_client_id != "" && var.google_client_id != "placeholder-will-be-ignored" ? [1] : []
         content {
           name  = "GOOGLE_CLIENT_ID"
           value = var.google_client_id
@@ -102,10 +120,52 @@ resource "google_cloud_run_v2_service" "auth_service" {
       }
 
       dynamic "env" {
-        for_each = var.google_client_secret != "" ? [1] : []
+        for_each = var.google_client_secret != "" && var.google_client_secret != "placeholder-will-be-ignored" ? [1] : []
         content {
           name  = "GOOGLE_CLIENT_SECRET"
           value = var.google_client_secret
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.google_redirect_uri != "" && var.google_redirect_uri != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "GOOGLE_REDIRECT_URI"
+          value = var.google_redirect_uri
+        }
+      }
+
+      # Google Cloud Storage (optional)
+      dynamic "env" {
+        for_each = var.gcs_bucket_name != "" && var.gcs_bucket_name != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "GCS_BUCKET_NAME"
+          value = var.gcs_bucket_name
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.gcs_project_id != "" && var.gcs_project_id != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "GCS_PROJECT_ID"
+          value = var.gcs_project_id
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.google_application_credentials != "" && var.google_application_credentials != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "GOOGLE_APPLICATION_CREDENTIALS"
+          value = var.google_application_credentials
+        }
+      }
+
+      # Frontend URL for OAuth redirects
+      dynamic "env" {
+        for_each = var.frontend_url != "" && var.frontend_url != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "FRONTEND_URL"
+          value = var.frontend_url
         }
       }
 
@@ -148,12 +208,9 @@ resource "google_cloud_run_v2_service" "auth_service" {
     percent = 100
   }
 
-  lifecycle {
-    ignore_changes = [
-      template[0].containers[0].image,
-      template[0].containers[0].env
-    ]
-  }
+  # Note: We don't use lifecycle ignore_changes here
+  # Instead, we control env updates via the --skip-env-update flag
+  # which uses dynamic blocks to conditionally set env vars
 }
 
 # IAM policy for public access (if enabled)

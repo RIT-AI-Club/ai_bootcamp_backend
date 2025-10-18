@@ -145,7 +145,9 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
     # For web applications, redirect to frontend with tokens in URL fragment
     # Frontend will extract tokens and store them
-    frontend_url = request.query_params.get("frontend_redirect", "http://localhost:3000/auth/callback")
+    # Use FRONTEND_URL from environment, or allow override via query param
+    default_frontend_redirect = f"{settings.FRONTEND_URL}/auth/callback"
+    frontend_url = request.query_params.get("frontend_redirect", default_frontend_redirect)
     redirect_url = f"{frontend_url}?access_token={access_token}&refresh_token={refresh_token}&token_type=bearer"
 
     return RedirectResponse(url=redirect_url)

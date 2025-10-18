@@ -253,22 +253,27 @@ allow_unauthenticated   = ${ALLOW_UNAUTHENTICATED:-true}
 EOF
     else
         cat > terraform.tfvars <<EOF
-project_id              = "${PROJECT_ID}"
-region                  = "${REGION}"
-service_name            = "${SERVICE_NAME}"
-image_url               = "${IMAGE_TAG}"
-database_url            = "${DATABASE_URL}"
-jwt_secret_key          = "${JWT_SECRET_KEY}"
-jwt_refresh_secret_key  = "${JWT_REFRESH_SECRET_KEY}"
-session_secret_key      = "${SESSION_SECRET_KEY}"
-cors_origins            = "${CORS_ORIGINS:-https://yourdomain.com}"
-google_client_id        = "${GOOGLE_CLIENT_ID:-}"
-google_client_secret    = "${GOOGLE_CLIENT_SECRET:-}"
-min_instances           = ${MIN_INSTANCES:-1}
-max_instances           = ${MAX_INSTANCES:-10}
-cpu                     = "${CPU:-1}"
-memory                  = "${MEMORY:-512Mi}"
-allow_unauthenticated   = ${ALLOW_UNAUTHENTICATED:-true}
+project_id                     = "${PROJECT_ID}"
+region                         = "${REGION}"
+service_name                   = "${SERVICE_NAME}"
+image_url                      = "${IMAGE_TAG}"
+database_url                   = "${DATABASE_URL}"
+jwt_secret_key                 = "${JWT_SECRET_KEY}"
+jwt_refresh_secret_key         = "${JWT_REFRESH_SECRET_KEY}"
+session_secret_key             = "${SESSION_SECRET_KEY}"
+cors_origins                   = "${CORS_ORIGINS:-}"
+google_client_id               = "${GOOGLE_CLIENT_ID:-}"
+google_client_secret           = "${GOOGLE_CLIENT_SECRET:-}"
+google_redirect_uri            = "${GOOGLE_REDIRECT_URI:-}"
+gcs_bucket_name                = "${GCS_BUCKET_NAME:-}"
+gcs_project_id                 = "${GCS_PROJECT_ID:-}"
+google_application_credentials = "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+frontend_url                   = "${FRONTEND_URL:-}"
+min_instances                  = ${MIN_INSTANCES:-1}
+max_instances                  = ${MAX_INSTANCES:-10}
+cpu                            = "${CPU:-1}"
+memory                         = "${MEMORY:-512Mi}"
+allow_unauthenticated          = ${ALLOW_UNAUTHENTICATED:-true}
 EOF
     fi
 
