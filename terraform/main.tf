@@ -46,6 +46,12 @@ resource "google_cloud_run_v2_service" "auth_service" {
         container_port = 8080
       }
 
+      # Mount GCS credentials secret as volume
+      volume_mounts {
+        name       = "gcp-key-volume"
+        mount_path = "/secrets"
+      }
+
       # Environment variables (only set if provided)
       env {
         name  = "ENVIRONMENT"
@@ -198,6 +204,19 @@ resource "google_cloud_run_v2_service" "auth_service" {
     timeout = "60s"
 
     max_instance_request_concurrency = 80
+
+    # Mount secret as volume
+    volumes {
+      name = "gcp-key-volume"
+      secret {
+        secret       = "gcp-key"
+        default_mode = 292 # 0444 in decimal (read-only)
+        items {
+          version = "latest"
+          path    = "gcp-key.json"
+        }
+      }
+    }
 
     # Service account (uses default compute service account if not specified)
     # service_account = "your-service-account@${var.project_id}.iam.gserviceaccount.com"
