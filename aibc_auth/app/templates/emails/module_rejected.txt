@@ -1,0 +1,23 @@
+AI Bootcamp - Revision Requested
+==================================
+
+Hi {{ user_name }},
+
+Your instructor has reviewed your submission for "{{ resource_title }}" in {{ module_title }} and is requesting some revisions.
+
+Instructor Feedback:
+{{ feedback }}
+
+What to do next:
+1. Review the instructor's feedback carefully
+2. Make the requested changes to your submission
+3. Re-upload your revised work
+4. Wait for the next review
+
+Revise your submission: {{ module_url }}
+
+Don't worry - revisions are a normal part of the learning process! 💪
+
+---
+© 2025 AI Bootcamp
+Help: {{ settings.FRONTEND_URL }}/help | Dashboard: {{ settings.FRONTEND_URL }}/dashboard

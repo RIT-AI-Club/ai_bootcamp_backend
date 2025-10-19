@@ -1,0 +1,25 @@
+AI Bootcamp - Module Approved
+===============================
+
+Hi {{ user_name }},
+
+Congratulations! Your submission for "{{ module_title }}" in the {{ pathway_title }} pathway has been approved by your instructor.
+
+✓ All resources reviewed and approved
+You can now proceed to the next module.
+
+Module Details:
+- Pathway: {{ pathway_title }}
+- Module: {{ module_title }}
+- Approved: {{ approved_date }}
+- Reviewed by: {{ reviewer_name }}
+
+{% if next_module %}Next up: {{ next_module.title }}{% endif %}
+
+View your progress: {{ dashboard_url }}
+
+Keep up the great work! 🎉
+
+---
+© 2025 AI Bootcamp
+Help: {{ settings.FRONTEND_URL }}/help | Dashboard: {{ settings.FRONTEND_URL }}/dashboard

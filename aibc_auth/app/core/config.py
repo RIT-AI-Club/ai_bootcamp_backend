@@ -40,12 +40,37 @@ class Settings(BaseSettings):
     GCS_PROJECT_ID: str = "your-gcp-project-id"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
 
+    # Email Notification Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@aiclub-bootcamp.com"
+    SMTP_FROM_NAME: str = "AI Bootcamp"
+    SMTP_USE_TLS: bool = True
+
+    # Admin Recipients for notifications
+    ADMIN_EMAILS: str = "romanslack1@gmail.com"
+
+    # Email Feature Flags
+    EMAIL_NOTIFICATIONS_ENABLED: bool = True
+    SEND_STUDENT_NOTIFICATIONS: bool = True
+    SEND_ADMIN_NOTIFICATIONS: bool = True
+    EMAIL_RATE_LIMIT_PER_HOUR: int = 50
+    EMAIL_RETRY_ATTEMPTS: int = 3
+    EMAIL_RETRY_DELAY_SECONDS: int = 60
+
     ENVIRONMENT: str = "development"
-    
+
     def get_cors_origins(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
             return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
         return self.CORS_ORIGINS
+
+    def get_admin_emails(self) -> List[str]:
+        if isinstance(self.ADMIN_EMAILS, str):
+            return [email.strip() for email in self.ADMIN_EMAILS.split(",")]
+        return self.ADMIN_EMAILS
     
     class Config:
         env_file = ".env"

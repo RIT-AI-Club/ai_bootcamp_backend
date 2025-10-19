@@ -410,6 +410,59 @@ async def mark_module_complete(
         # Mark as complete (will be in 'pending' approval status by default)
         completion = await ProgressCRUD.mark_module_complete(db, current_user.id, completion_data)
         logger.info(f"Module marked complete (pending review): {completion.id}")
+
+        # Send notification email to admins
+        try:
+            from app.core.email import email_service
+            from sqlalchemy import select
+            from app.models.progress import Module, Pathway
+            from app.crud import resource as resource_crud
+
+            # Get module and pathway info
+            module_result = await db.execute(select(Module).where(Module.id == completion_data.module_id))
+            module = module_result.scalar_one_or_none()
+
+            pathway_result = await db.execute(select(Pathway).where(Pathway.id == completion_data.pathway_id))
+            pathway = pathway_result.scalar_one_or_none()
+
+            if module and pathway:
+                # Get resources that require review (exercises/projects)
+                resources = await resource_crud.get_resources_by_module(db, completion_data.module_id)
+                resources_pending = []
+                for res in resources:
+                    if res.requires_upload:
+                        resources_pending.append({
+                            'type': res.type,
+                            'title': res.title
+                        })
+
+                # Get student progress
+                user_progress = await ProgressCRUD.get_user_progress(db, current_user.id, completion_data.pathway_id)
+                student_progress = {
+                    'completed_modules': user_progress.completed_modules if user_progress else 0,
+                    'pathway_progress': user_progress.progress_percentage if user_progress else 0,
+                    'total_time_hours': round((user_progress.total_time_spent_minutes if user_progress else 0) / 60, 1)
+                }
+
+                await email_service.send_module_submitted_to_admins(
+                    db=db,
+                    user_id=current_user.id,
+                    student_email=current_user.email,
+                    student_name=current_user.full_name,
+                    module_id=module.id,
+                    module_title=module.title,
+                    pathway_id=pathway.id,
+                    pathway_title=pathway.title,
+                    submission_date=completion.completed_at,
+                    resources_pending=resources_pending,
+                    student_progress=student_progress,
+                    module_completion_id=completion.id
+                )
+                logger.info(f"Admin notification emails sent for module {module.title}")
+        except Exception as e:
+            logger.error(f"Failed to send admin notification email: {e}")
+            # Don't fail the request - email is non-critical
+
         return completion
 
     except HTTPException:

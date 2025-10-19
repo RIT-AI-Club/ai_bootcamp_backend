@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="color: #10b981;">✅ Module Approved!</h2>
+
+<p>Hi {{ user_name }},</p>
+
+<p>Congratulations! Your submission for <strong>{{ module_title }}</strong> in the <strong>{{ pathway_title }}</strong> pathway has been approved by your instructor.</p>
+
+<div class="info-box success">
+    <p style="margin: 0; color: #166534; font-weight: 600;">✓ All resources reviewed and approved</p>
+    <p style="margin: 8px 0 0 0; color: #166534;">You can now proceed to the next module.</p>
+</div>
+
+<p><strong>Module Details:</strong></p>
+<ul>
+    <li>Pathway: {{ pathway_title }}</li>
+    <li>Module: {{ module_title }}</li>
+    <li>Approved: {{ approved_date }}</li>
+    <li>Reviewed by: {{ reviewer_name }}</li>
+</ul>
+
+{% if next_module %}
+<p><strong>Next up:</strong> {{ next_module.title }}</p>
+{% endif %}
+
+<p style="margin-top: 32px;">
+    <a href="{{ dashboard_url }}" class="button">View Your Progress</a>
+</p>
+
+<p style="margin-top: 24px; color: #666666;">Keep up the great work! 🎉</p>
+{% endblock %}

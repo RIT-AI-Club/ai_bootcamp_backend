@@ -740,6 +740,36 @@ def review_submission(submission_id):
             submission_id
         ))
 
+        # Send rejection email if rejected
+        if data['submission_status'] == 'rejected':
+            try:
+                from email_helper import send_module_rejected_email_sync
+
+                # Get user and resource info
+                cur.execute("""
+                    SELECT u.email, u.full_name, r.title as resource_title, m.title as module_title, r.pathway_id
+                    FROM resource_submissions rs
+                    JOIN users u ON rs.user_id = u.id
+                    JOIN resources r ON rs.resource_id = r.id
+                    JOIN modules m ON r.module_id = m.id
+                    WHERE rs.id = %s
+                """, (submission_id,))
+                email_data = cur.fetchone()
+
+                if email_data:
+                    send_module_rejected_email_sync(
+                        user_email=email_data['email'],
+                        user_name=email_data['full_name'],
+                        resource_title=email_data['resource_title'],
+                        module_title=email_data['module_title'],
+                        pathway_id=email_data['pathway_id'],
+                        feedback=data.get('review_comments', 'Please review and resubmit your work.')
+                    )
+                    print(f"[EMAIL] Rejection email sent to {email_data['email']}")
+            except Exception as e:
+                print(f"[EMAIL ERROR] Failed to send rejection email: {e}")
+                # Don't fail the review - email is non-critical
+
         # AUTO-APPROVE MODULE LOGIC: Check if all resources in the module are now approved
         if data['submission_status'] == 'approved':
             module_id = submission['module_id']
@@ -813,6 +843,34 @@ def review_submission(submission_id):
                         WHERE id = %s
                     """, (module_completion['id'],))
                     print(f"[AUTO-APPROVE] Module {module_id} auto-approved for user {user_id}!")
+
+                    # Send approval email to student
+                    try:
+                        from email_helper import send_module_approved_email_sync
+
+                        # Get user email and pathway info from the query we already have
+                        cur.execute("""
+                            SELECT u.email, u.full_name, m.title as module_title, p.title as pathway_title, p.id as pathway_id
+                            FROM users u
+                            JOIN module_completions mc ON u.id = mc.user_id
+                            JOIN modules m ON mc.module_id = m.id
+                            JOIN pathways p ON mc.pathway_id = p.id
+                            WHERE mc.id = %s
+                        """, (module_completion['id'],))
+                        email_data = cur.fetchone()
+
+                        if email_data:
+                            send_module_approved_email_sync(
+                                user_email=email_data['email'],
+                                user_name=email_data['full_name'],
+                                module_title=email_data['module_title'],
+                                pathway_title=email_data['pathway_title'],
+                                pathway_id=email_data['pathway_id']
+                            )
+                            print(f"[EMAIL] Approval email sent to {email_data['email']}")
+                    except Exception as e:
+                        print(f"[EMAIL ERROR] Failed to send approval email: {e}")
+                        # Don't fail the review - email is non-critical
                 else:
                     print(f"[AUTO-APPROVE] Not all resources approved yet")
             else:

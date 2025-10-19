@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="color: #ef4444;">📝 Revision Requested</h2>
+
+<p>Hi {{ user_name }},</p>
+
+<p>Your instructor has reviewed your submission for <strong>{{ resource_title }}</strong> in <strong>{{ module_title }}</strong> and is requesting some revisions.</p>
+
+<div class="info-box warning">
+    <p style="margin: 0; color: #991b1b; font-weight: 600;">Instructor Feedback:</p>
+    <p style="margin: 8px 0 0 0; color: #991b1b;">{{ feedback }}</p>
+</div>
+
+<p><strong>What to do next:</strong></p>
+<ol>
+    <li>Review the instructor's feedback carefully</li>
+    <li>Make the requested changes to your submission</li>
+    <li>Re-upload your revised work</li>
+    <li>Wait for the next review</li>
+</ol>
+
+<p style="margin-top: 32px;">
+    <a href="{{ module_url }}" class="button">Revise Submission</a>
+</p>
+
+<p style="margin-top: 24px; color: #666666;">Don't worry - revisions are a normal part of the learning process! 💪</p>
+{% endblock %}

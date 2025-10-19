@@ -782,6 +782,44 @@ async def review_submission(
 
         logger.info(f"Instructor {current_user.email} reviewed submission {submission_id}: {review.grade}")
 
+        # Send rejection email to student if rejected
+        if review.submission_status == 'rejected':
+            try:
+                from app.core.email import email_service
+                from sqlalchemy import select
+                from app.models.user import User
+                from app.models.progress import Module, Pathway
+
+                # Get user info
+                user_result = await db.execute(select(User).where(User.id == submission.user_id))
+                user = user_result.scalar_one_or_none()
+
+                # Get module and pathway info
+                module_result = await db.execute(select(Module).where(Module.id == resource.module_id))
+                module = module_result.scalar_one_or_none()
+
+                pathway_result = await db.execute(select(Pathway).where(Pathway.id == resource.pathway_id))
+                pathway = pathway_result.scalar_one_or_none()
+
+                if user and module and pathway:
+                    await email_service.send_module_rejected(
+                        db=db,
+                        user_id=user.id,
+                        user_email=user.email,
+                        user_name=user.full_name,
+                        resource_id=resource.id,
+                        resource_title=resource.title,
+                        module_id=module.id,
+                        module_title=module.title,
+                        pathway_id=pathway.id,
+                        feedback=review.review_comments or "Please review and resubmit your work.",
+                        resource_submission_id=submission_id
+                    )
+                    logger.info(f"Rejection email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send rejection email: {e}")
+                # Don't fail the request - email is non-critical
+
         # AUTO-APPROVE MODULE LOGIC: Check if all resources in the module are now approved
         if review.submission_status == 'approved':
             from sqlalchemy import select, update
@@ -858,6 +896,52 @@ async def review_submission(
                     )
                     await db.commit()
                     logger.info(f"Auto-approved module {resource.module_id} for user {submission.user_id} - all resources approved")
+
+                    # Send approval email to student
+                    try:
+                        from app.core.email import email_service
+                        from app.models.user import User
+                        from app.models.progress import Module, Pathway
+
+                        # Get user, module, and pathway info
+                        user_result = await db.execute(select(User).where(User.id == submission.user_id))
+                        user = user_result.scalar_one_or_none()
+
+                        module_result = await db.execute(select(Module).where(Module.id == resource.module_id))
+                        module = module_result.scalar_one_or_none()
+
+                        pathway_result = await db.execute(select(Pathway).where(Pathway.id == resource.pathway_id))
+                        pathway = pathway_result.scalar_one_or_none()
+
+                        # Get next module (if any)
+                        next_module_result = await db.execute(
+                            select(Module)
+                            .where(Module.pathway_id == resource.pathway_id)
+                            .where(Module.order_index > module.order_index)
+                            .order_by(Module.order_index.asc())
+                            .limit(1)
+                        )
+                        next_module = next_module_result.scalar_one_or_none()
+
+                        if user and module and pathway:
+                            await email_service.send_module_approved(
+                                db=db,
+                                user_id=user.id,
+                                user_email=user.email,
+                                user_name=user.full_name,
+                                module_id=module.id,
+                                module_title=module.title,
+                                pathway_id=pathway.id,
+                                pathway_title=pathway.title,
+                                approved_date=datetime.now(timezone.utc),
+                                reviewer_name=current_user.full_name or "Instructor",
+                                next_module={'title': next_module.title} if next_module else None
+                            )
+                            logger.info(f"Approval email sent to {user.email}")
+                    except Exception as e:
+                        logger.error(f"Failed to send approval email: {e}")
+                        # Don't fail the request - email is non-critical
+
                 else:
                     logger.info(f"Not all resources approved yet for module {resource.module_id}")
 

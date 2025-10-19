@@ -1,0 +1,26 @@
+AI Bootcamp - New Module Submission
+=====================================
+
+A student has submitted a module for review.
+
+Student: {{ student_name }} ({{ student_email }})
+Pathway: {{ pathway_title }}
+Module: {{ module_title }}
+Submitted: {{ submission_date }}
+
+Resources to Review ({{ resources_count }}):
+{% for resource in resources_pending %}
+- {{ resource.type|title }}: {{ resource.title }}
+{% endfor %}
+
+Student Progress:
+- Modules completed: {{ student_progress.completed_modules }}
+- Pathway progress: {{ student_progress.pathway_progress }}%
+- Total time spent: {{ student_progress.total_time_hours }}h
+
+Review submission: {{ admin_dashboard_url }}
+
+Please review within 48 hours to maintain student momentum.
+
+---
+© 2025 AI Bootcamp
