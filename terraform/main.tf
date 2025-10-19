@@ -175,6 +175,110 @@ resource "google_cloud_run_v2_service" "auth_service" {
         }
       }
 
+      # Email notification configuration
+      dynamic "env" {
+        for_each = var.smtp_host != "" && var.smtp_host != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SMTP_HOST"
+          value = var.smtp_host
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.smtp_port != 0 ? [1] : []
+        content {
+          name  = "SMTP_PORT"
+          value = tostring(var.smtp_port)
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.smtp_username != "" && var.smtp_username != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SMTP_USERNAME"
+          value = var.smtp_username
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.smtp_password != "" && var.smtp_password != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SMTP_PASSWORD"
+          value = var.smtp_password
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.smtp_from_email != "" && var.smtp_from_email != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SMTP_FROM_EMAIL"
+          value = var.smtp_from_email
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.smtp_from_name != "" && var.smtp_from_name != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SMTP_FROM_NAME"
+          value = var.smtp_from_name
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.smtp_use_tls != "" && var.smtp_use_tls != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "SMTP_USE_TLS"
+          value = var.smtp_use_tls
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.admin_emails != "" && var.admin_emails != "placeholder-will-be-ignored" ? [1] : []
+        content {
+          name  = "ADMIN_EMAILS"
+          value = var.admin_emails
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.email_notifications_enabled != "" ? [1] : []
+        content {
+          name  = "EMAIL_NOTIFICATIONS_ENABLED"
+          value = var.email_notifications_enabled
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.send_student_notifications != "" ? [1] : []
+        content {
+          name  = "SEND_STUDENT_NOTIFICATIONS"
+          value = var.send_student_notifications
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.send_admin_notifications != "" ? [1] : []
+        content {
+          name  = "SEND_ADMIN_NOTIFICATIONS"
+          value = var.send_admin_notifications
+        }
+      }
+
+      env {
+        name  = "EMAIL_RATE_LIMIT_PER_HOUR"
+        value = tostring(var.email_rate_limit_per_hour)
+      }
+
+      env {
+        name  = "EMAIL_RETRY_ATTEMPTS"
+        value = tostring(var.email_retry_attempts)
+      }
+
+      env {
+        name  = "EMAIL_RETRY_DELAY_SECONDS"
+        value = tostring(var.email_retry_delay_seconds)
+      }
+
       # Startup probe for health checks
       startup_probe {
         http_get {

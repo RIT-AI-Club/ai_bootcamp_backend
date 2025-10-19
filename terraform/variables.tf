@@ -91,6 +91,93 @@ variable "frontend_url" {
   default     = ""
 }
 
+# Email notification variables
+variable "smtp_host" {
+  description = "SMTP server host"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  description = "SMTP server port"
+  type        = number
+  default     = 587
+}
+
+variable "smtp_username" {
+  description = "SMTP username"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "smtp_password" {
+  description = "SMTP password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "smtp_from_email" {
+  description = "From email address"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_from_name" {
+  description = "From name for emails"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_use_tls" {
+  description = "Use TLS for SMTP"
+  type        = string
+  default     = "true"
+}
+
+variable "admin_emails" {
+  description = "Admin email addresses (comma-separated)"
+  type        = string
+  default     = ""
+}
+
+variable "email_notifications_enabled" {
+  description = "Enable email notifications"
+  type        = string
+  default     = "true"
+}
+
+variable "send_student_notifications" {
+  description = "Send student notifications"
+  type        = string
+  default     = "true"
+}
+
+variable "send_admin_notifications" {
+  description = "Send admin notifications"
+  type        = string
+  default     = "true"
+}
+
+variable "email_rate_limit_per_hour" {
+  description = "Email rate limit per hour"
+  type        = number
+  default     = 50
+}
+
+variable "email_retry_attempts" {
+  description = "Email retry attempts"
+  type        = number
+  default     = 3
+}
+
+variable "email_retry_delay_seconds" {
+  description = "Email retry delay in seconds"
+  type        = number
+  default     = 60
+}
+
 variable "cors_origins" {
   description = "Allowed CORS origins (comma-separated)"
   type        = string
