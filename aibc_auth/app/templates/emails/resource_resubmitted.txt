@@ -1,0 +1,31 @@
+AI Bootcamp - Resource Resubmitted
+====================================
+
+A student has resubmitted a resource that was previously rejected.
+
+Student: {{ student_name }} ({{ student_email }})
+Resource: {{ resource_title }}
+Module: {{ module_title }}
+Pathway: {{ pathway_title }}
+Resubmitted: {{ resubmission_date }}
+
+{% if previous_feedback %}Your Previous Feedback:
+{{ previous_feedback }}
+{% endif %}
+
+File Details:
+- Filename: {{ file_name }}
+- Size: {{ file_size_mb }} MB
+- Type: {{ file_type }}
+- Submission attempt: #{{ submission_count }}
+
+Student Progress:
+- Modules completed: {{ student_progress.completed_modules }}
+- Pathway progress: {{ student_progress.pathway_progress }}%
+
+Review resubmission: {{ admin_dashboard_url }}
+
+The student has addressed your feedback and is waiting for your review.
+
+---
+© 2025 AI Bootcamp

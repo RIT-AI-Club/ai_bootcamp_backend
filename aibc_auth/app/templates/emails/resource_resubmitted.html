@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="color: #3b82f6;">🔄 Resource Resubmitted</h2>
+
+<p>A student has resubmitted a resource that was previously rejected.</p>
+
+<div class="info-box warning">
+    <p style="margin: 0;"><strong>Student:</strong> {{ student_name }} ({{ student_email }})</p>
+    <p style="margin: 8px 0 0 0;"><strong>Resource:</strong> {{ resource_title }}</p>
+    <p style="margin: 8px 0 0 0;"><strong>Module:</strong> {{ module_title }}</p>
+    <p style="margin: 8px 0 0 0;"><strong>Pathway:</strong> {{ pathway_title }}</p>
+    <p style="margin: 8px 0 0 0;"><strong>Resubmitted:</strong> {{ resubmission_date }}</p>
+</div>
+
+{% if previous_feedback %}
+<p><strong>Your Previous Feedback:</strong></p>
+<div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; margin: 16px 0; border-radius: 4px;">
+    <p style="margin: 0; color: #991b1b; font-size: 13px;">{{ previous_feedback }}</p>
+</div>
+{% endif %}
+
+<p><strong>File Details:</strong></p>
+<ul>
+    <li>Filename: {{ file_name }}</li>
+    <li>Size: {{ file_size_mb }} MB</li>
+    <li>Type: {{ file_type }}</li>
+    <li>Submission attempt: #{{ submission_count }}</li>
+</ul>
+
+<p><strong>Student Progress:</strong></p>
+<ul>
+    <li>Modules completed: {{ student_progress.completed_modules }}</li>
+    <li>Pathway progress: {{ student_progress.pathway_progress }}%</li>
+</ul>
+
+<p style="margin-top: 32px;">
+    <a href="{{ admin_dashboard_url }}" class="button">Review Resubmission</a>
+</p>
+
+<p style="margin-top: 24px; color: #666666; font-size: 14px;">The student has addressed your feedback and is waiting for your review.</p>
+{% endblock %}

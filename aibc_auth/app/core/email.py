@@ -344,5 +344,74 @@ class EmailService:
 
         return success
 
+    async def send_resource_resubmitted_to_admins(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        student_email: str,
+        student_name: str,
+        resource_id: str,
+        resource_title: str,
+        module_id: str,
+        module_title: str,
+        pathway_id: str,
+        pathway_title: str,
+        resubmission_date: datetime,
+        file_name: str,
+        file_size_bytes: int,
+        file_type: str,
+        submission_count: int,
+        previous_feedback: str,
+        student_progress: dict,
+        resource_submission_id: Optional[UUID] = None
+    ) -> bool:
+        """Notify admins when student resubmits a previously rejected resource"""
+        if not settings.SEND_ADMIN_NOTIFICATIONS:
+            return False
+
+        admin_emails = settings.get_admin_emails()
+        if not admin_emails:
+            logger.warning("No admin emails configured for notifications")
+            return False
+
+        context = {
+            'student_name': student_name,
+            'student_email': student_email,
+            'resource_title': resource_title,
+            'module_title': module_title,
+            'pathway_title': pathway_title,
+            'resubmission_date': resubmission_date.strftime('%B %d, %Y at %I:%M %p'),
+            'file_name': file_name,
+            'file_size_mb': round(file_size_bytes / 1024 / 1024, 2),
+            'file_type': file_type,
+            'submission_count': submission_count,
+            'previous_feedback': previous_feedback,
+            'student_progress': student_progress,
+            'admin_dashboard_url': f"{settings.FRONTEND_URL.replace('www.', 'admin.')}/submissions"
+        }
+
+        log_metadata = {
+            'email_type': 'resource_resubmitted',
+            'user_id': user_id,
+            'module_id': module_id,
+            'pathway_id': pathway_id,
+            'resource_submission_id': resource_submission_id
+        }
+
+        # Send to all admin emails
+        success = True
+        for admin_email in admin_emails:
+            result = await self.send_email(
+                to_email=admin_email,
+                subject=f"🔄 Resubmission: {resource_title} by {student_name}",
+                template_name='resource_resubmitted',
+                context=context,
+                db=db,
+                log_metadata=log_metadata
+            )
+            success = success and result
+
+        return success
+
 # Singleton instance
 email_service = EmailService()

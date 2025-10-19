@@ -454,6 +454,74 @@ async def upload_resource_file(
 
         logger.info(f"User {current_user.email} uploaded file for resource {resource_id}")
 
+        # Check if this is a resubmission (previous submission was rejected)
+        previous_submissions = await resource_crud.get_submissions_for_resource(
+            db, current_user.id, resource_id
+        )
+        is_resubmission = len(previous_submissions) > 1  # More than one submission means resubmission
+
+        # Find the most recent rejected submission to get feedback
+        previous_feedback = None
+        if is_resubmission:
+            for prev_sub in previous_submissions:
+                if prev_sub.id != submission.id and prev_sub.submission_status == 'rejected':
+                    previous_feedback = prev_sub.review_comments or "No feedback provided"
+                    break
+
+        # Send resubmission notification to admins if this is a resubmission
+        if is_resubmission:
+            try:
+                from app.core.email import email_service
+                from sqlalchemy import select
+                from app.models.progress import Module, Pathway, UserProgress
+
+                # Get module and pathway info
+                module_result = await db.execute(select(Module).where(Module.id == resource.module_id))
+                module = module_result.scalar_one_or_none()
+
+                pathway_result = await db.execute(select(Pathway).where(Pathway.id == resource.pathway_id))
+                pathway = pathway_result.scalar_one_or_none()
+
+                if module and pathway:
+                    # Get student progress
+                    user_progress = await db.execute(
+                        select(UserProgress).where(
+                            UserProgress.user_id == current_user.id,
+                            UserProgress.pathway_id == resource.pathway_id
+                        )
+                    )
+                    progress = user_progress.scalar_one_or_none()
+
+                    student_progress = {
+                        'completed_modules': progress.completed_modules if progress else 0,
+                        'pathway_progress': progress.progress_percentage if progress else 0
+                    }
+
+                    await email_service.send_resource_resubmitted_to_admins(
+                        db=db,
+                        user_id=current_user.id,
+                        student_email=current_user.email,
+                        student_name=current_user.full_name,
+                        resource_id=resource_id,
+                        resource_title=resource.title,
+                        module_id=module.id,
+                        module_title=module.title,
+                        pathway_id=pathway.id,
+                        pathway_title=pathway.title,
+                        resubmission_date=submission.created_at,
+                        file_name=file.filename,
+                        file_size_bytes=file_size,
+                        file_type=file.content_type,
+                        submission_count=len(previous_submissions),
+                        previous_feedback=previous_feedback or "No previous feedback",
+                        student_progress=student_progress,
+                        resource_submission_id=submission.id
+                    )
+                    logger.info(f"Resubmission notification sent to admins for {resource.title}")
+            except Exception as e:
+                logger.error(f"Failed to send resubmission notification: {e}")
+                # Don't fail the upload - email is non-critical
+
         return FileUploadResponse(
             submission_id=submission.id,
             resource_id=resource_id,
