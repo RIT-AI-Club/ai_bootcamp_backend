@@ -13,7 +13,9 @@ from google.cloud import storage
 from google.oauth2 import service_account
 
 # Load environment from parent directory
-load_dotenv('/home/roman/ai_bootcamp_backend/.env.production')
+# load_dotenv('/home/roman/ai_bootcamp_backend/.env.production')
+# load_dotenv('/home/roman/ai_bootcamp_backend/aibc_auth/.env')
+load_dotenv('/home/roman/ai_bootcamp_backend/aibc_auth/.env')
 
 app = Flask(__name__)
 app.secret_key = 'admin-dashboard-secret-key'

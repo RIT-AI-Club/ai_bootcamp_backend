@@ -52,7 +52,8 @@ class EmailService:
             "port": self.smtp_port,
             "username": self.smtp_username,
             "password": self.smtp_password,
-            "use_tls": self.smtp_use_tls,
+            "use_tls": False,  # Don't use direct TLS
+            "start_tls": self.smtp_use_tls,  # Use STARTTLS instead
             "timeout": 30
         }
 
