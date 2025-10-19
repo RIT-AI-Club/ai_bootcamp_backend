@@ -1,6 +1,6 @@
 # AI Club Bootcamp
 
-
+![AI Club Bootcamp](./images/readme_image_bootcamp.png)
 
 [![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-5A67D8?style=flat&logo=anthropic&logoColor=white)](https://claude.ai/claude-code)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -8,7 +8,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)](https://www.postgresql.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-![AI Club Bootcamp](./images/readme_image_bootcamp.png)
+
 
 > A comprehensive, production-ready AI education platform providing free, accessible learning pathways for modern AI tools and techniques. Developed in collaboration with the RIT AI Club.
 
